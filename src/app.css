@@ -1,29 +1,56 @@
 /**
  * Base tokens.
  *
- * Dark chrome around a bright wall: the 3D scene is the only place colour is
- * allowed to shout, and the accent is always the current route's grade colour.
+ * Art direction: a climbing gym after hours. Deep blue-black chrome around a
+ * warm, lit plywood wall — the 3D scene is the only place colour is allowed
+ * to shout, and the accent is the current route's tape colour. Every mode
+ * has its own colour (practice cyan, highball amber, tread violet, dyno
+ * orange) and uses it the same way everywhere: a chip, a border, a glow.
+ *
+ * Text on chrome uses three inks, all at least 4.5:1 on the darkest panel;
+ * anything drawn over the wall sits on a glass panel (--glass) so it is
+ * readable whatever is behind it.
  */
 
 :root {
-  --bg: #12141a;
-  --bg-raised: #191c24;
-  --bg-sunk: #0d0f14;
+  --bg: #10121a;
+  --bg-raised: #181b25;
+  --bg-sunk: #0b0d13;
+  --panel: #1b1f2a;
+  --glass: rgba(14, 16, 23, 0.8);
+  --glass-strong: rgba(12, 14, 20, 0.92);
   --line: rgba(255, 255, 255, 0.1);
   --line-strong: rgba(255, 255, 255, 0.2);
-  --ink: #f2f3f6;
-  --ink-dim: rgba(242, 243, 246, 0.62);
-  --ink-faint: rgba(242, 243, 246, 0.36);
+  --ink: #f3f4f7;
+  --ink-dim: rgba(243, 244, 247, 0.74);
+  --ink-faint: rgba(243, 244, 247, 0.56);
   --accent: #5fd1a0;
   --good: #5fd1a0;
   --warn: #f2c249;
-  --bad: #e8564f;
+  --bad: #ef5a50;
+  --lab: #3fd4e8;
+  --highball: #f2a13c;
+  --tread: #a596ff;
+  --dyno: #ff8f3c;
+  --daily: #6ee0a8;
   --r-sm: 0.5rem;
   --r-md: 0.75rem;
   --r-lg: 1.1rem;
+  --shadow: 0 0.6rem 1.6rem -0.6rem rgba(0, 0, 0, 0.7);
+  /* The type scale: nothing a player needs to read is under --fs-xs (12px). */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.5rem;
+  --fs-2xl: 2.25rem;
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: ui-rounded, 'SF Pro Rounded', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --tap: 2.75rem;
 }
 
 * { box-sizing: border-box; }
@@ -49,6 +76,10 @@ body {
 #root { display: flex; flex-direction: column; }
 
 button { font: inherit; color: inherit; }
+button:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 .btn {
   appearance: none;
@@ -57,31 +88,46 @@ button { font: inherit; color: inherit; }
   color: var(--ink);
   border-radius: var(--r-md);
   padding: 0.85rem 1.15rem;
-  font-size: 0.94rem;
-  font-weight: 600;
+  font-size: var(--fs-md);
+  font-weight: 700;
   cursor: pointer;
-  min-height: 2.9rem;
-  transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+  min-height: 3rem;
+  transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .btn:active { transform: scale(0.975); }
-.btn:disabled { opacity: 0.35; cursor: default; }
+.btn:disabled { opacity: 0.4; cursor: default; }
 .btn--primary {
   background: var(--accent);
   border-color: transparent;
-  color: #11141a;
+  color: #0e1117;
+  box-shadow: 0 0.5rem 1.4rem -0.5rem color-mix(in srgb, var(--accent) 70%, transparent);
 }
 .btn--ghost {
   background: transparent;
-  border-color: var(--line);
+  border-color: var(--line-strong);
   color: var(--ink-dim);
 }
 
 .label {
   text-transform: uppercase;
   letter-spacing: 0.11em;
-  font-size: 0.66rem;
-  font-weight: 700;
+  font-size: var(--fs-xs);
+  font-weight: 800;
   color: var(--ink-faint);
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.45em;
+  padding: 0.05em 0.35em;
+  margin: 0 0.12em;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 0.3em;
+  background: rgba(255, 255, 255, 0.06);
+  font: 700 0.82em/1.3 var(--font);
+  text-align: center;
+  color: var(--ink);
 }
 
 @media (prefers-reduced-motion: reduce) {

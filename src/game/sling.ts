@@ -2051,18 +2051,26 @@ function release(state: SlingState, l: SlingLimb, events: SlingEvent[], reason: 
 
 function slipReason(hold: Hold, l: SlingLimb, anchor: Vec2, state: SlingState): string {
   const label = profileOf(hold.type).label.toLowerCase();
-  const angle = loadAlignment(hold, pullDirection(hold, l, anchor));
   if (!isHand(l.id)) {
     if (hold.type === 'smear') return 'The smear skated. Hips were not over it.';
     if (wallAngleAtHold(state, hold) > 0.35) return `Foot popped off the ${label}. Steep ground needs core to keep feet on.`;
     return `Foot skated off the ${label}.`;
   }
-  if (l.heldT < ESTABLISH_TIME) return `Arrived too fast for a ${label}. Slow down into it, or deadpoint.`;
-  if (angle < 0.5) return `Wrong angle on the ${label}. Get your body under the way it pulls.`;
-  const cond = condOf(state);
-  if (cond.grip[l.id as 'LH' | 'RH'] < 0.45) return `Too pumped to hold the ${label}.`;
-  if ((l.impact ?? 0) > 0.2 || bodySpeed(state) > 1.2) return `Too much swing for a ${label}.`;
-  return `Not enough on your feet for a ${label}. It peeled.`;
+  // Each thing the capacity is made of, as how far short it fell — and the
+  // reason given is the one that fell furthest short, not the first one an
+  // if-chain happened to check. Every number here is one the step used.
+  const angle = loadAlignment(hold, pullDirection(hold, l, anchor));
+  const grip = condOf(state).grip[l.id as 'LH' | 'RH'];
+  const short: [number, string][] = [
+    [l.heldT < ESTABLISH_TIME ? 1 - l.heldT / ESTABLISH_TIME : 0, `Arrived too fast for a ${label}. Slow down into it, or deadpoint.`],
+    [clamp01((0.75 - angle) / 0.75), `Wrong angle on the ${label}. Get your body under the way it pulls.`],
+    [clamp01((0.7 - grip) / 0.7), `Too pumped to hold the ${label}. Rest on your feet first.`],
+    [Math.max(clamp01((l.impact ?? 0) / 0.4), clamp01((bodySpeed(state) - 0.6) / 1.5)), `Too much swing for a ${label}. Let the body settle first.`],
+    // Whatever the others do not explain is the load itself: too little on the feet.
+    [0.2, `Not enough on your feet for a ${label}. It peeled.`],
+  ];
+  short.sort((a, b) => b[0] - a[0]);
+  return short[0][1];
 }
 
 function wallAngleAtHold(state: SlingState, hold: Hold): number {
