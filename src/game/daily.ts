@@ -69,6 +69,35 @@ export function attemptsRemaining(d: DailyState): number {
   return Math.max(0, DAILY_ATTEMPTS - d.attemptsUsed);
 }
 
+/**
+ * Whether another daily attempt can start. Three a day, sent or not: a sent
+ * daily can be climbed again from the board as an ordinary route, but the
+ * daily's own attempts are spent.
+ */
+export function canAttemptDaily(d: DailyState): boolean {
+  return attemptsRemaining(d) > 0;
+}
+
+/**
+ * Folds one finished daily attempt in — only ever called for a climb that
+ * was started as the daily, never for the same route climbed from the board.
+ * An attempt past the limit changes nothing.
+ */
+export function recordDailyAttempt(
+  d: DailyState,
+  outcome: { sent: false } | { sent: true; moves: number; efficiency: number },
+): DailyState {
+  if (!canAttemptDaily(d)) return d;
+  const used = { ...d, attemptsUsed: d.attemptsUsed + 1, onsightAvailable: false };
+  if (!outcome.sent) return { ...used, falls: d.falls + 1 };
+  return {
+    ...used,
+    sent: true,
+    bestMoves: d.bestMoves === null ? outcome.moves : Math.min(d.bestMoves, outcome.moves),
+    bestEfficiency: Math.max(d.bestEfficiency ?? 0, outcome.efficiency),
+  };
+}
+
 /** Rolls the daily forward if the stored one is from an earlier day. */
 export function refreshDaily(stored: DailyState | null, key: string = dayKey()): DailyState {
   if (stored && stored.day === key) return stored;
