@@ -1102,7 +1102,16 @@ function swapOff(state: SlingState, l: SlingLimb, events: SlingEvent[]): void {
 
 // --- reach -----------------------------------------------------------------
 
-const envCache = new WeakMap<SlingState, { key: string; env: Record<string, Envelope> }>();
+/**
+ * Envelopes by what they are worked out from — the hips, shoulders and every
+ * limb's position, phase and hook — not by which state object asked. The aim
+ * preview runs every throw on a fresh copy of the body, so a cache keyed by
+ * the object missed every time and each targeted preview re-solved the
+ * envelope (about 17 ms). The key is everything envelopeOf reads, so a hit is
+ * the same answer. A handful of bodies is all an aim ever needs.
+ */
+const envCache = new Map<string, Record<string, Envelope>>();
+const ENV_CACHE_SIZE = 12;
 
 /**
  * Everywhere a limb can get to from here, with the body free to move after
@@ -1112,11 +1121,17 @@ const envCache = new WeakMap<SlingState, { key: string; env: Record<string, Enve
 export function reachEnvelope(state: SlingState, limb: LimbId): Envelope {
   const key = [state.hip.x, state.hip.y, state.shoulder.x, state.shoulder.y,
     ...LIMBS.flatMap((id) => [state.limbs[id].pos.x, state.limbs[id].pos.y, state.limbs[id].phase, state.limbs[id].hooked ? 1 : 0])].join(',');
-  let c = envCache.get(state);
-  if (!c || c.key !== key) {
-    c = { key, env: {} };
-    envCache.set(state, c);
+  let env = envCache.get(key);
+  if (env) {
+    // Most recently used goes to the back, so the oldest is the one evicted.
+    envCache.delete(key);
+    envCache.set(key, env);
+  } else {
+    env = {};
+    envCache.set(key, env);
+    if (envCache.size > ENV_CACHE_SIZE) envCache.delete(envCache.keys().next().value!);
   }
+  const c = { env };
   if (!c.env[limb]) {
     const limbs = {} as Record<LimbId, { pos: Vec2; held: boolean; hooked?: boolean }>;
     for (const id of LIMBS) {
@@ -1836,10 +1851,20 @@ export function stepSling(
     const passing = state.dyno && l.vel.y > SLING.dynoPass;
     if (passing) l.touch = null;
     const aimedAt = !state.dyno && l.target != null ? map.get(l.target) : undefined;
+    // The swept segment's box. A hold further than its own contact radius
+    // from the box is further than that from the segment, so it can neither
+    // brush nor catch: skipped before any of the per-hold work. (Exactly the
+    // holds the distance test below would have rejected; nothing else.)
+    const sx0 = Math.min(l.prev.x, l.pos.x);
+    const sx1 = Math.max(l.prev.x, l.pos.x);
+    const sy0 = Math.min(l.prev.y, l.pos.y);
+    const sy1 = Math.max(l.prev.y, l.pos.y);
     for (const h of passing ? [] : aimedAt ? [aimedAt] : holds) {
+      const hr = contactRadius(h.size, h.type);
+      if (h.pos.x < sx0 - hr || h.pos.x > sx1 + hr || h.pos.y < sy0 - hr || h.pos.y > sy1 + hr) continue;
       if (blocked.has(h.id)) continue;
       if (!canUse(h.type, id)) {
-        if (closestOnSegment(h.pos, l.prev, l.pos).d <= contactRadius(h.size, h.type)) l.brushedChip = true;
+        if (closestOnSegment(h.pos, l.prev, l.pos).d <= hr) l.brushedChip = true;
         continue;
       }
       // The hold you let go of does not grab you back. Fall past it and the
@@ -1848,9 +1873,8 @@ export function stepSling(
       // Nor does the jug right next to it, while the limb is still leaving:
       // a foot thrown off a chip is not caught by the hand hold beside it.
       if (!aimedAt && l.launchAt && dist(h.pos, l.launchAt) < LAUNCH_CLEAR && dist(l.pos, l.launchAt) < LAUNCH_CLEAR + 0.08) continue;
-      const r = contactRadius(h.size, h.type);
       const { at, d } = closestOnSegment(h.pos, l.prev, l.pos);
-      if (d <= r && (!near || d < near.d)) near = { hold: h, at, d };
+      if (d <= hr && (!near || d < near.d)) near = { hold: h, at, d };
     }
 
     // A hand closes on the hold where it passes closest to it, not where it

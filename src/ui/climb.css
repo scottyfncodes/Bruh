@@ -281,7 +281,9 @@
   bottom: calc(var(--safe-b) + 0.6rem);
   z-index: 4;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
   pointer-events: none;
 }
 .climb__hint {
@@ -465,11 +467,6 @@
 /* --- the top --- */
 
 .climb__top-note {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(var(--safe-b) + 4rem);
-  z-index: 4;
   padding: 0.5rem 0.9rem;
   border-radius: 999px;
   background: #fff;

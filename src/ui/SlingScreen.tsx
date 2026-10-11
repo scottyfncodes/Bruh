@@ -258,6 +258,7 @@ export function SlingScreen({
   const lockRef = useRef<number | null>(null);
   const endedRef = useRef<{ at: number; outcome: 'sent' | 'fallen' } | null>(null);
   const flashTimer = useRef(0);
+  const dynoReadyTimer = useRef(0);
   const reasonRef = useRef<string | null>(null);
   /** When the reason was last set, frame clock ms: a fall is only blamed on something that just happened. */
   const reasonAtRef = useRef(-Infinity);
@@ -404,7 +405,8 @@ export function SlingScreen({
       sfxDynoReady();
       buzz([10, 30, 10, 30, 40]);
       fxRef.current.kick(0.15);
-      window.setTimeout(() => say('DYNO READY', 'The belly is live. Make it count.', 1700), 320);
+      window.clearTimeout(dynoReadyTimer.current);
+      dynoReadyTimer.current = window.setTimeout(() => say('DYNO READY', 'The belly is live. Make it count.', 1700), 320);
     }
     box?.classList.toggle('is-ready', isFull(after));
     bump((n) => n + 1);
@@ -872,10 +874,13 @@ export function SlingScreen({
         if (pumpRef.current || whyRef.current) {
           const posture = postureOf(sim);
           const arrow = trend === 'recovering' ? ' ↓' : trend === 'steady' ? '' : trend === 'climbing' ? ' ↑' : ' ↑↑';
-          if (pumpRef.current) pumpRef.current.textContent = `${pumpStage(p.pump)}${arrow}`;
+          // Written only when they change: a text write every frame is a layout every frame.
+          const word = `${pumpStage(p.pump)}${arrow}`;
+          if (pumpRef.current && pumpRef.current.textContent !== word) pumpRef.current.textContent = word;
           if (whyRef.current) {
-            whyRef.current.textContent = `${trend} · ${pumpReason(posture, trend)}`;
-            whyRef.current.dataset.trend = trend;
+            const why = `${trend} · ${pumpReason(posture, trend)}`;
+            if (whyRef.current.textContent !== why) whyRef.current.textContent = why;
+            if (whyRef.current.dataset.trend !== trend) whyRef.current.dataset.trend = trend;
           }
         }
         if (climbing && p.pump > 0.35 && coachCurRef.current === null && wantsTip(coachRef.current, 'pump')) showCoach('pump', 9000);
@@ -888,7 +893,10 @@ export function SlingScreen({
         const b = bodyRef.current;
         if (powerBarRef.current) powerBarRef.current.style.transform = `scaleX(${b.power})`;
         if (coreBarRef.current) coreBarRef.current.style.transform = `scaleX(${b.core})`;
-        if (breathRef.current) breathRef.current.textContent = breathWord(b.breath);
+        if (breathRef.current) {
+          const bw = breathWord(b.breath);
+          if (breathRef.current.textContent !== bw) breathRef.current.textContent = bw;
+        }
         // Breathing you can hear once it is heavy.
         if (climbing && b.breath > 0.45 && now >= breathAtRef.current) {
           sfxBreath(b.breath);
@@ -910,7 +918,10 @@ export function SlingScreen({
         sfxExposure(phaseRef.current === 'climbing' ? clamp((sim.hip.y - 2.2) / 5.5, 0, 1) : 0);
       }
       if (tread && phaseRef.current !== 'inspect') {
-        if (treadTimeRef.current) treadTimeRef.current.textContent = formatTime(tread.t);
+        if (treadTimeRef.current) {
+          const tt = formatTime(tread.t);
+          if (treadTimeRef.current.textContent !== tt) treadTimeRef.current.textContent = tt;
+        }
         const sec = sectionAt(tread, handsY);
         if (treadMetaRef.current) {
           const meta = `${sec ? SECTION_LABEL[sec.kind] : 'Start'} · ${levelGrade(sec?.level ?? tread.level)} · ${tread.ground.toFixed(1)} m`;
@@ -1643,8 +1654,14 @@ export function SlingScreen({
     onTreadEnd?.(buildRun('stopped'));
   };
 
-  // Leaving the climb takes the wind with it.
-  useEffect(() => () => stopExposure(), []);
+  // Leaving the climb takes the wind with it, and anything still waiting to fire.
+  useEffect(() => () => {
+    stopExposure();
+    window.clearTimeout(flashTimer.current);
+    window.clearTimeout(coachTimer.current);
+    window.clearTimeout(confirmTimer.current);
+    window.clearTimeout(dynoReadyTimer.current);
+  }, []);
 
   // Test hook, only with ?debug in the URL: lift the body and let go of
   // everything, so the smoke test can check a fall and its landing.
@@ -1923,14 +1940,14 @@ export function SlingScreen({
         </div>
       )}
 
-      {phase === 'climbing' && nearTop && (
-        <div className="climb__top-note">
-          Match <b>both hands</b> on the white hold to finish.
-        </div>
-      )}
 
       {phase === 'climbing' && (
         <div className="climb__bottom" ref={bottomUiRef}>
+          {nearTop && !tread && (
+            <div className="climb__top-note">
+              Match <b>both hands</b> on the white hold to finish.
+            </div>
+          )}
           {coach ? (
             <div className="coach" role="status">
               <div className="coach__text">
@@ -2026,7 +2043,12 @@ function BreathButton({ until, onGo }: { until: number; onGo: () => void }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (until <= Date.now()) return;
-    const id = window.setInterval(() => setNow(Date.now()), 250);
+    const id = window.setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      // The wait is over: stop ticking.
+      if (t >= until) window.clearInterval(id);
+    }, 250);
     return () => window.clearInterval(id);
   }, [until]);
   const left = Math.ceil((until - now) / 1000);

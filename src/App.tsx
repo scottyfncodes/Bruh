@@ -40,7 +40,7 @@ type Screen =
   | { kind: 'board' }
   | { kind: 'standings' }
   | { kind: 'climb'; route: Route; mode: AttemptMode; daily: boolean }
-  | { kind: 'result'; route: Route; attempt: Attempt; card: ScoreCard; best: ScoreCard | null }
+  | { kind: 'result'; route: Route; attempt: Attempt; card: ScoreCard; best: ScoreCard | null; gained?: number }
   | { kind: 'breakthrough'; data: BreakthroughData; unlocked: number }
   | { kind: 'highballs' }
   | { kind: 'treadLobby' }
@@ -182,7 +182,8 @@ export default function App() {
 
     // Worked out once, here, from the profile as it is — not inside a state
     // updater, which React may run twice and which must not have side effects.
-    const { breakthrough } = applySend(profile, route, card, toBeta(attempt.moves));
+    const { profile: preview, breakthrough } = applySend(profile, route, card, toBeta(attempt.moves));
+    const gained = preview.points - profile.points;
     pendingBreakthrough.current = breakthrough
       ? { data: breakthrough, unlocked: countNewRoutes(profile, breakthrough.grade) }
       : null;
@@ -196,7 +197,7 @@ export default function App() {
       return next;
     });
 
-    setScreen({ kind: 'result', route, attempt, card, best: previousBest });
+    setScreen({ kind: 'result', route, attempt, card, best: previousBest, gained });
   }, [profile, update, daily]);
 
   const closeResult = useCallback(() => {
@@ -256,7 +257,7 @@ export default function App() {
           mode="project"
           fitness={fitnessFor(profile.topGrade, profile.totalSends)}
           onExit={() => setScreen({ kind: 'treadLobby' })}
-          onOutcome={() => undefined}
+          onOutcome={ignoreOutcome}
           tread={screen.session}
           treadBest={profile.tread?.best[screen.session.program.id] ?? null}
           onTreadEnd={endTread}
@@ -301,6 +302,7 @@ export default function App() {
           attempt={screen.attempt}
           card={screen.card}
           personalBest={screen.best}
+          gained={screen.gained}
           onAgain={() => startClimb(screen.route, {})}
           onDone={closeResult}
         />
@@ -318,6 +320,13 @@ export default function App() {
   }
 }
 
+
+/**
+ * The tread wall reports through onTreadEnd, not onOutcome. A fixed function
+ * rather than an inline one: the climb screen's frame loop depends on it, and
+ * a new one each render restarted the loop on every App render.
+ */
+function ignoreOutcome(): void {}
 
 /** How many routes appear on the board that were not there before. */
 function countNewRoutes(before: Parameters<typeof unlockedGrades>[0], afterTop: Grade | null): number {

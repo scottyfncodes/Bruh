@@ -9,7 +9,7 @@ import { Climber, type Mood } from './climber';
 import { WallWarp, placeOn, surfaceStrip } from './fold';
 import { type WallProfile, FLAT } from '../game/profile';
 import { PANEL, PANEL_HALF_WIDTH } from '../game/tread';
-import { CAVE_LOOK, SIDE_LOOK, SLAT_LOOK, type WallLook, contactShadowTexture, wallTexture } from './wallTexture';
+import { CAVE_LOOK, SIDE_LOOK, SLAT_LOOK, TOWER_LOOK, type WallLook, contactShadowTexture, wallTexture } from './wallTexture';
 
 /**
  * The gym, rendered.
@@ -82,11 +82,16 @@ export class WallScene {
   private padGroup = new THREE.Group();
   /** True for the tread wall: a belt in a frame instead of the cave. */
   private tread = false;
+  /** True on the highball tower: its own paint. */
+  private tower = false;
   /** The treadwall's frame: it does not move with the belt. */
   private treadFrame = new THREE.Group();
   /** Contact shadows under holds: one shared material and quad. */
   private blobMat: THREE.MeshBasicMaterial | null = null;
   private blobGeo = new THREE.PlaneGeometry(1, 1);
+  /** The canvas's CSS size as of the last resize, for projecting without a layout read. */
+  private size = { w: 1, h: 1 };
+  private scratch = new THREE.Vector3();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -104,6 +109,8 @@ export class WallScene {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 40);
+    const r0 = canvas.getBoundingClientRect();
+    this.size = { w: r0.width || 1, h: r0.height || 1 };
     this.plane.add(this.wallGroup, this.holdGroup, this.climber.group);
     this.scene.add(this.plane, this.treadFrame);
     const blob = contactShadowTexture();
@@ -217,7 +224,7 @@ export class WallScene {
     const left = WALL.minX - edge;
     const right = WALL.maxX + edge;
 
-    this.wallGroup.add(this.panel(CAVE_LOOK, left, right, y0, y1));
+    this.wallGroup.add(this.panel(this.tower ? TOWER_LOOK : CAVE_LOOK, left, right, y0, y1));
     this.wallGroup.add(this.panel(SIDE_LOOK, cx - w / 2, left, y0, y1, -0.002));
     this.wallGroup.add(this.panel(SIDE_LOOK, right, cx + w / 2, y0, y1, -0.002));
 
@@ -330,6 +337,11 @@ export class WallScene {
   /** Rebuilds the on-route holds. Called once per route, not per frame. */
   setRoute(route: Route): void {
     this.route = route;
+    const tower = route.wall === 'tower';
+    if (tower !== this.tower) {
+      this.tower = tower;
+      this.buildWall();
+    }
     for (const m of this.holdMeshes.values()) {
       this.holdGroup.remove(m);
       (m.material as THREE.Material).dispose();
@@ -576,12 +588,14 @@ export class WallScene {
    */
   project(p: Vec2, z: number = HOLD_Z): { x: number; y: number; visible: boolean } {
     // Wall-space to world: the same warp everything on the wall goes through.
-    const v = this.warp.point(p.x, p.y - this.scroll, z);
+    // The overlay calls this dozens of times a frame, so it reuses one vector
+    // and the canvas size from the last resize rather than allocating and
+    // asking the layout engine every time.
+    const v = this.warp.point(p.x, p.y - this.scroll, z, this.scratch);
     v.project(this.camera);
-    const rect = this.canvas.getBoundingClientRect();
     return {
-      x: (v.x * 0.5 + 0.5) * rect.width,
-      y: (-v.y * 0.5 + 0.5) * rect.height,
+      x: (v.x * 0.5 + 0.5) * this.size.w,
+      y: (-v.y * 0.5 + 0.5) * this.size.h,
       visible: v.z < 1,
     };
   }
@@ -599,14 +613,14 @@ export class WallScene {
 
   /** Metres per pixel at the wall plane. Keeps drag feel consistent at any zoom. */
   metresPerPixel(): number {
-    const rect = this.canvas.getBoundingClientRect();
-    return rect.height > 0 ? this.cam.frame / rect.height : 0.01;
+    return this.size.h > 0 ? this.cam.frame / this.size.h : 0.01;
   }
 
   // --- loop --------------------------------------------------------------
 
   resize(): void {
     const rect = this.canvas.getBoundingClientRect();
+    this.size = { w: rect.width, h: rect.height };
     const w = Math.max(1, Math.floor(rect.width));
     const h = Math.max(1, Math.floor(rect.height));
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -622,17 +636,29 @@ export class WallScene {
     this.renderer.render(this.scene, this.camera);
   }
 
+  /**
+   * Frees everything this scene owns on the GPU and gives the WebGL context
+   * back. Each climb mounts a fresh canvas, so without the context loss a
+   * session of climbs piled contexts up until the browser started dropping
+   * them. Shared resources are left alone: the hold geometry cache and the
+   * wall textures are drawn once for the whole app.
+   */
   dispose(): void {
     this.disposed = true;
     this.climber.dispose();
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
     this.scene.traverse((o) => {
-      if (o instanceof THREE.Mesh) {
-        const m = o.material;
-        if (Array.isArray(m)) m.forEach((x) => x.dispose());
-        else m.dispose();
-      }
+      if (!(o instanceof THREE.Mesh)) return;
+      if (!o.userData.sharedGeometry && o.geometry !== this.blobGeo) geometries.add(o.geometry);
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) materials.add(m);
     });
+    for (const g of geometries) g.dispose();
+    for (const m of materials) m.dispose();
+    this.blobGeo.dispose();
+    this.key?.shadow.map?.dispose();
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
   }
 }
 

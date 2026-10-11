@@ -126,11 +126,36 @@ export function envelopeOf(body: ReachBody, limb: LimbId, lim: ReachLimits): Env
   };
 }
 
+/** The box round every anchor, worked out once per envelope. */
+const boxes = new WeakMap<Envelope, { x0: number; x1: number; y0: number; y1: number }>();
+function boxOf(env: Envelope) {
+  let b = boxes.get(env);
+  if (!b) {
+    b = { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity };
+    for (const a of env.anchors) {
+      if (a.x < b.x0) b.x0 = a.x;
+      if (a.x > b.x1) b.x1 = a.x;
+      if (a.y < b.y0) b.y0 = a.y;
+      if (a.y > b.y1) b.y1 = a.y;
+    }
+    boxes.set(env, b);
+  }
+  return b;
+}
+
 /** Whether a point is in the envelope, with `slack` metres of give (a hold's radius). */
 export function inEnvelope(env: Envelope, p: Vec2, slack = 0): boolean {
   const r = env.max + slack;
+  // Further than r from the box round every anchor is further than r from
+  // all of them; and a pose more than r away along either axis is more than
+  // r away. Both only skip what the distance test would reject, so the
+  // answer is the same — this is what the aim preview spends most time in.
+  const b = boxOf(env);
+  if (p.x < b.x0 - r || p.x > b.x1 + r || p.y < b.y0 - r || p.y > b.y1 + r) return false;
   for (let i = 0; i < env.anchors.length; i++) {
-    if (p.y - slack <= env.tops[i] && dist(env.anchors[i], p) <= r) return true;
+    const a = env.anchors[i];
+    if (Math.abs(a.x - p.x) > r || Math.abs(a.y - p.y) > r) continue;
+    if (p.y - slack <= env.tops[i] && dist(a, p) <= r) return true;
   }
   return false;
 }
