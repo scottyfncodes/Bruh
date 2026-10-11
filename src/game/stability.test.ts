@@ -43,7 +43,7 @@ function unexplained(v: { x: number; y: number }, y: number, peak: number, k = 1
   const fall = Math.sqrt(2 * G_MAX * Math.max(0, peak - y)) + THROW_SPEED * k;
   return -v.y > fall; // down, faster than the drop allows
 }
-/** How far past the wall's edge the hips may hang off a hold on it. */
+/** How far past the wall's edge the hips may hang off a hold on it, while anything is held. */
 const EDGE_MARGIN = 0.3;
 /** Highest the hips can be over the top hold: stood up on it, and a bit. */
 const ABOVE_TOP = 1.5;
@@ -85,7 +85,10 @@ function fuzz(routeId: string, seed = 7): Stats {
         peak = Math.max(peak, s.hip.y, s.shoulder.y);
         if (!s.dyno && (unexplained(s.hipV, s.hip.y, peak) || unexplained(s.shV, s.shoulder.y, peak, 1.5))) spiked = true;
         if (!s.dyno && s.hip.y > top + ABOVE_TOP) high = true;
-        if (Math.abs(s.hip.x) > Math.max(WALL.maxX, -WALL.minX) + EDGE_MARGIN) edge = true;
+        // On the wall, the hips stay over it. With nothing held the body is
+        // falling, and a fall can drift a little past the edge on its way down
+        // — that is a fall, judged by the speed and height checks above.
+        if (heldCount(s) > 0 && Math.abs(s.hip.x) > Math.max(WALL.maxX, -WALL.minX) + EDGE_MARGIN) edge = true;
         if (heldCount(s) === 0 && !s.dyno) unheld += SLING.dt; else unheld = 0;
         stats.maxUnheld = Math.max(stats.maxUnheld, unheld);
       }
@@ -114,7 +117,7 @@ describe('stability: random throws never put energy into the body', () => {
       expect(st.throws).toBeGreaterThan(100);
       expect(st, 'body speed spikes outside a dyno').toMatchObject({ spikes: 0 });
       expect(st.tooHigh, 'hips far above the top of the route').toBe(0);
-      expect(st.offEdge, 'hips past the edge of the wall').toBe(0);
+      expect(st.offEdge, 'hips past the edge of the wall while on it').toBe(0);
       // Nothing held and not falling is a fall, within the grace period.
       expect(st.maxUnheld).toBeLessThanOrEqual(SLING.fallGrace + SLING.dt * 2);
     }, 60_000);

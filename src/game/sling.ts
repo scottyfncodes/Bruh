@@ -224,10 +224,11 @@ const CORRECTION_SPEED = 6;
  * How much of a stretched reach the flying limb gives back, rather than all
  * of it going into the body. Nearly none — the body goes after the limb — but
  * not none: a limb that never gives fought the holds that were still pinning
- * the body every iteration, and with both immovable the solver's stalemate
- * leaked out as the body being hauled down the wall at 30 g.
+ * the body every iteration, and with both immovable the stalemate dragged
+ * the body off the edge of the wall. Kept small because it is also reach:
+ * at 0.1 the climbing bot could no longer send Read It Again (V9).
  */
-const FOLLOW_GIVE = 0.1;
+const FOLLOW_GIVE = 0.04;
 
 /**
  * The velocity a particle comes out of the solver with: its move this step,
