@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  PANEL, TREAD_PROGRAMS, advanceTread, formatTime, levelGrade, programById, startTread, streamRoute,
+  HOLD_X, PANEL, PANEL_HALF_WIDTH, TREAD_PROGRAMS, advanceTread, formatTime, levelGrade, programById, startTread, streamRoute,
 } from './tread';
 import { solveRoute } from './autoplay';
 import { climb } from './climbBot';
 import { initialSling, stepSling, SLING } from './sling';
 import { flatProfile } from './profile';
+import { contactRadius } from './holds';
 
 const classic = programById('classic');
 
@@ -34,6 +35,21 @@ describe('the belt', () => {
     expect(Math.min(...ys)).toBeGreaterThan(s.ground - 0.61);
     // No pile-up: the panel holds a sensible number of holds however long it runs.
     expect(s.holds.length).toBeLessThan(60);
+  });
+
+  it('sets every hold on the belt the renderer draws: inside the panel, clear of its frame', () => {
+    for (const p of TREAD_PROGRAMS) {
+      for (const seed of [1, 7, 23]) {
+        const s = startTread(p, seed);
+        for (let t = 0; t < 900; t += 0.5) {
+          advanceTread(s, 0.5, { pump: (t % 60) / 60, power: 0.8 });
+          for (const h of s.holds) {
+            expect(Math.abs(h.pos.x) + contactRadius(h.size, h.type)).toBeLessThanOrEqual(PANEL_HALF_WIDTH);
+            expect(Math.abs(h.pos.x)).toBeLessThanOrEqual(HOLD_X + 1e-9);
+          }
+        }
+      }
+    }
   });
 
   it('is deterministic for a seed', () => {

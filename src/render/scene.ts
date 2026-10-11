@@ -8,14 +8,24 @@ import { holdGeometry } from './holdGeometry';
 import { Climber, type Mood } from './climber';
 import { WallWarp, placeOn, surfaceStrip } from './fold';
 import { type WallProfile, FLAT } from '../game/profile';
+import { PANEL, PANEL_HALF_WIDTH } from '../game/tread';
+import { CAVE_LOOK, SIDE_LOOK, SLAT_LOOK, type WallLook, contactShadowTexture, wallTexture } from './wallTexture';
 
 /**
  * The gym, rendered.
  *
- * Readability is the whole brief: the wall is flat and light, the holds are
- * chunky and cast real shadows so you can see how far they stick out, and the
- * climber is the only saturated thing on screen. Nothing here is trying to look
- * like a photograph.
+ * Readability is the whole brief, and the art direction serves it: the
+ * climbing wall is warm, used plywood with its T-nut grid showing — the
+ * brightest surface in the room — set into darker painted walls either side,
+ * so the eye goes to the part you can climb. The holds are the stars: taped
+ * colours, a little gloss, a soft contact shadow under each so you can see
+ * how far they stand out. Off-route holds are there but quiet. Bernie is the
+ * only other saturated thing on screen. Nothing here is trying to look like a
+ * photograph; it is trying to look like a gym you want to climb in.
+ *
+ * The tread wall is its own machine: a narrow leaning frame with a belt of
+ * slats that rolls down, a hood over the top roller and a skirt at the
+ * bottom one, standing in the same room.
  */
 
 export type CameraState = {
@@ -60,6 +70,8 @@ export class WallScene {
   private climber = new Climber();
   private holdGroup = new THREE.Group();
   private holdMeshes = new Map<number, THREE.Mesh>();
+  /** Where each streamed (tread) hold is up the belt, for clipping to it. */
+  private holdY = new Map<number, number>();
   private canvas: HTMLCanvasElement;
   private cam: CameraState = { ...DEFAULT_CAMERA };
   private disposed = false;
@@ -68,6 +80,13 @@ export class WallScene {
   private scroll = 0;
   /** Highball pads, rebuilt when the landing changes. */
   private padGroup = new THREE.Group();
+  /** True for the tread wall: a belt in a frame instead of the cave. */
+  private tread = false;
+  /** The treadwall's frame: it does not move with the belt. */
+  private treadFrame = new THREE.Group();
+  /** Contact shadows under holds: one shared material and quad. */
+  private blobMat: THREE.MeshBasicMaterial | null = null;
+  private blobGeo = new THREE.PlaneGeometry(1, 1);
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -75,12 +94,20 @@ export class WallScene {
       canvas, antialias: true, alpha: false, powerPreference: 'high-performance',
     });
     this.renderer.setClearColor(GYM.back);
+    // A neutral tone map keeps the taped hold colours true while letting the
+    // lit wall roll off gently instead of clipping flat.
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // PCFSoftShadowMap is deprecated in r185 (it falls back to PCF with a
+    // console warning); PCF with a radius gives the same soft edge.
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 40);
     this.plane.add(this.wallGroup, this.holdGroup, this.climber.group);
-    this.scene.add(this.plane);
+    this.scene.add(this.plane, this.treadFrame);
+    const blob = contactShadowTexture();
+    if (blob) this.blobMat = new THREE.MeshBasicMaterial({ map: blob, transparent: true, depthWrite: false, toneMapped: false });
     this.buildEnvironment();
     this.buildWall();
     this.applyCamera();
@@ -91,20 +118,30 @@ export class WallScene {
   private buildEnvironment(): void {
     const w = (WALL.maxX - WALL.minX) * 4;
     const cx = (WALL.minX + WALL.maxX) / 2;
+    // The room falls away into the dark at the far sides of a wide screen.
+    this.scene.fog = new THREE.Fog(GYM.back, 12, 26);
 
     const mat = new THREE.Mesh(
       new THREE.BoxGeometry(w + 2, 0.34, 2.6),
-      new THREE.MeshStandardMaterial({ color: GYM.mat, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ color: GYM.mat, roughness: 0.92 }),
     );
     mat.position.set(cx, -0.17, 1.2);
     mat.receiveShadow = true;
     this.scene.add(mat);
+    // The mat's front edge, a band of the darker vinyl, so it reads as a pad and not a floor.
+    const lip = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 2, 0.06, 0.08),
+      new THREE.MeshStandardMaterial({ color: GYM.matEdge, roughness: 0.9 }),
+    );
+    lip.position.set(cx, 0.0, 2.48);
+    this.scene.add(lip);
 
-    this.scene.add(new THREE.HemisphereLight('#f2efe8', '#3a3f52', 1.5));
-    const key = new THREE.DirectionalLight('#fff6e6', 2.1);
+    this.scene.add(new THREE.HemisphereLight('#f6efe2', '#2c3246', 1.35));
+    const key = new THREE.DirectionalLight('#fff3df', 2.3);
     key.position.set(2.6, 5.2, 4.2);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
+    key.shadow.radius = 3;
     key.shadow.camera.near = 1;
     key.shadow.camera.far = 16;
     // Tall enough for the long routes up the cave.
@@ -119,7 +156,8 @@ export class WallScene {
     this.key = key;
     this.scene.add(this.padGroup);
 
-    const fill = new THREE.DirectionalLight('#cfe0ff', 0.5);
+    // A cool rim from the other side: edges on the holds and on Bernie.
+    const fill = new THREE.DirectionalLight('#c9dcff', 0.65);
     fill.position.set(-3.4, 1.4, 3);
     this.scene.add(fill);
 
@@ -136,50 +174,155 @@ export class WallScene {
    * running out of gym looks like a bug.
    */
   private buildWall(): void {
-    for (const o of [...this.wallGroup.children]) {
-      this.wallGroup.remove(o);
-      o.traverse((m) => {
-        if (m instanceof THREE.Mesh) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
-      });
+    for (const g of [this.wallGroup, this.treadFrame]) {
+      for (const o of [...g.children]) {
+        g.remove(o);
+        o.traverse((m) => {
+          if (m instanceof THREE.Mesh) {
+            if (m.geometry !== this.blobGeo && !m.userData.sharedGeometry) m.geometry.dispose();
+            if (m.material !== this.blobMat) (m.material as THREE.Material).dispose();
+          }
+        });
+      }
     }
+    if (this.tread) this.buildTread();
+    else this.buildCave();
+  }
+
+  /** A strip of wall in a look. */
+  private panel(look: WallLook, x0: number, x1: number, y0: number, y1: number, z = 0, roughness = 0.95): THREE.Mesh {
+    const map = wallTexture(look);
+    const m = new THREE.Mesh(
+      surfaceStrip(this.warp, x0, x1, y0, y1, z),
+      new THREE.MeshStandardMaterial({ color: map ? '#ffffff' : look.base, map, roughness, metalness: 0, side: THREE.DoubleSide }),
+    );
+    m.receiveShadow = true;
+    return m;
+  }
+
+  /**
+   * The cave, the shape the route says. Generously oversized: at a wide
+   * desktop aspect the camera sees far more wall than the climbable area, and
+   * running out of gym looks like a bug — so past the climbing wall there is
+   * more gym, painted dark and set with other people's problems, quiet.
+   */
+  private buildCave(): void {
     const warp = this.warp;
     const w = (WALL.maxX - WALL.minX) * 4;
     const h = WALL.maxY * 2.6;
     const cx = (WALL.minX + WALL.maxX) / 2;
     const y0 = -0.6;
     const y1 = h - 0.6;
+    const edge = 0.08;
+    const left = WALL.minX - edge;
+    const right = WALL.maxX + edge;
 
-    const wall = new THREE.Mesh(
-      surfaceStrip(warp, cx - w / 2, cx + w / 2, y0, y1, 0),
-      new THREE.MeshStandardMaterial({ color: GYM.wall, roughness: 0.95, metalness: 0, side: THREE.DoubleSide }),
-    );
-    wall.receiveShadow = true;
-    this.wallGroup.add(wall);
+    this.wallGroup.add(this.panel(CAVE_LOOK, left, right, y0, y1));
+    this.wallGroup.add(this.panel(SIDE_LOOK, cx - w / 2, left, y0, y1, -0.002));
+    this.wallGroup.add(this.panel(SIDE_LOOK, right, cx + w / 2, y0, y1, -0.002));
 
-    // Panel seams. Purely visual, but they give the eye a scale reference,
-    // which matters when you are judging whether a move is 30cm or 60cm — and
-    // on a bent wall they are what shows you where it bends.
-    const seamMat = new THREE.MeshBasicMaterial({ color: GYM.seam, side: THREE.DoubleSide });
-    for (let y = 0.2; y < WALL.maxY + 2.4; y += 1.22) {
-      const seam = new THREE.Mesh(surfaceStrip(warp, cx - w / 2, cx + w / 2, y - 0.007, y + 0.007, 0.006, 0.02), seamMat);
-      this.wallGroup.add(seam);
-    }
-    for (const x of [WALL.minX - 0.05, cx, WALL.maxX + 0.05]) {
-      const seam = new THREE.Mesh(surfaceStrip(warp, x - 0.007, x + 0.007, y0, y1, 0.006), seamMat);
-      this.wallGroup.add(seam);
+    // The climbing wall's edges: a raised trim, so it reads as a built
+    // feature with an arête on each side rather than paint on a flat board.
+    const trimMat = new THREE.MeshStandardMaterial({ color: GYM.trim, roughness: 0.6, metalness: 0.15 });
+    for (const x of [left, right]) {
+      for (let y = y0; y < y1; y += 0.5) {
+        const seg = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.52, 0.05), trimMat);
+        placeOn(warp, seg, x, y + 0.25, 0.022);
+        seg.castShadow = true;
+        this.wallGroup.add(seg);
+      }
     }
 
     // Off-route holds: dressing, and the reason reading a line is a skill.
-    const decorMat = new THREE.MeshStandardMaterial({
-      color: GYM.decor, roughness: 0.9, metalness: 0,
-    });
+    // Quiet: lighter and greyer than any route colour, so the line pops.
+    const decorMat = new THREE.MeshStandardMaterial({ color: GYM.decor, roughness: 0.95, metalness: 0 });
     for (const d of DECOR) {
       const m = new THREE.Mesh(holdGeometry(d.type), decorMat);
+      m.userData.sharedGeometry = true;
       placeOn(warp, m, d.x, d.y, HOLD_Z, d.roll);
       m.scale.setScalar(contactRadius(d.size, d.type));
       m.castShadow = true;
       this.wallGroup.add(m);
     }
+    // The neighbouring walls' problems, in their own colours but sunk into
+    // the dark paint: the gym is busy, it is just not your route.
+    let seed = 0x2545f491;
+    const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
+    const types: Hold['type'][] = ['jug', 'crimp', 'sloper', 'pinch', 'pocket', 'foothold', 'volume'];
+    const tones = ['#5b6b5e', '#5d5a72', '#6e5a4f', '#4f6273', '#6b6450'];
+    const sideMats = tones.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }));
+    for (let i = 0; i < 70; i++) {
+      const sgn = rnd() < 0.5 ? -1 : 1;
+      const x = sgn * (WALL.maxX + 0.45 + rnd() * 4.5);
+      const y = 0.3 + rnd() * (WALL.maxY + 2);
+      const type = types[Math.floor(rnd() * types.length)];
+      const m = new THREE.Mesh(holdGeometry(type), sideMats[Math.floor(rnd() * sideMats.length)]);
+      m.userData.sharedGeometry = true;
+      placeOn(warp, m, x, y, HOLD_Z, rnd() * Math.PI * 2);
+      m.scale.setScalar(contactRadius(type === 'volume' ? 0.12 : 0.06 + rnd() * 0.05, type));
+      this.wallGroup.add(m);
+    }
+  }
+
+  /**
+   * The treadwall. In the sim the belt is the holds staying put while the
+   * floor rises; here it is what it looks like: slats rolling down through a
+   * frame, under a hood at the top and into a skirt at the bottom. The belt
+   * (in wallGroup) scrolls; the frame (treadFrame) stays where it is. Both
+   * are drawn to PANEL and PANEL_HALF_WIDTH, the same numbers the stream
+   * sets its holds inside.
+   */
+  private buildTread(): void {
+    const warp = this.warp;
+    const hw = PANEL_HALF_WIDTH;
+    const room = (WALL.maxX - WALL.minX) * 4;
+
+    // The room behind it: the gym wall, dark, a little behind the machine.
+    const back = this.panel(SIDE_LOOK, -room / 2, room / 2, -0.6, WALL.maxY * 2, -0.35);
+    this.treadFrame.add(back);
+
+    // The belt: slats from below the skirt to above the hood, so the wrap is
+    // never seen. It scrolls with the holds and wraps one slat at a time.
+    this.wallGroup.add(this.panel(SLAT_LOOK, -hw, hw, -0.6, PANEL + 0.36, 0, 0.85));
+
+    const steel = new THREE.MeshStandardMaterial({ color: GYM.steel, roughness: 0.45, metalness: 0.55 });
+    const dark = new THREE.MeshStandardMaterial({ color: GYM.machine, roughness: 0.7, metalness: 0.2 });
+    const accent = new THREE.MeshStandardMaterial({ color: GYM.treadAccent, roughness: 0.5, metalness: 0.1, emissive: GYM.treadAccent, emissiveIntensity: 0.25 });
+    const rail = (x: number) => {
+      // Side rails: a box section running the length of the belt, standing proud of it.
+      for (let y = -0.1; y < PANEL + 0.2; y += 0.4) {
+        const seg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.42, 0.16), steel);
+        placeOn(warp, seg, x, y + 0.2, 0.05);
+        seg.castShadow = true;
+        seg.receiveShadow = true;
+        this.treadFrame.add(seg);
+      }
+      // The accent stripe down the rail's face: the machine's colour.
+      const stripe = new THREE.Mesh(surfaceStrip(warp, x - 0.018, x + 0.018, 0, PANEL + 0.15, 0.135), accent);
+      this.treadFrame.add(stripe);
+    };
+    rail(-hw - 0.06);
+    rail(hw + 0.06);
+
+    // The hood over the top roller, where the slats come round: it covers the
+    // top of the belt, so holds arrive from under it.
+    const hood = new THREE.Mesh(new THREE.BoxGeometry(hw * 2 + 0.36, 0.44, 0.42), dark);
+    placeOn(warp, hood, 0, PANEL + 0.2, 0.16);
+    hood.castShadow = true;
+    this.treadFrame.add(hood);
+    const hoodLip = new THREE.Mesh(new THREE.BoxGeometry(hw * 2 + 0.36, 0.04, 0.43), accent);
+    placeOn(warp, hoodLip, 0, PANEL - 0.01, 0.16);
+    this.treadFrame.add(hoodLip);
+
+    // The skirt at the floor: where the slats, and the holds on them, go under.
+    const skirt = new THREE.Mesh(new THREE.BoxGeometry(hw * 2 + 0.36, 0.28, 0.3), dark);
+    placeOn(warp, skirt, 0, 0.0, 0.1);
+    skirt.castShadow = true;
+    skirt.receiveShadow = true;
+    this.treadFrame.add(skirt);
+    const lipMesh = new THREE.Mesh(new THREE.BoxGeometry(hw * 2 + 0.36, 0.035, 0.31), accent);
+    placeOn(warp, lipMesh, 0, 0.14, 0.1);
+    this.treadFrame.add(lipMesh);
   }
 
   // --- route -------------------------------------------------------------
@@ -192,24 +335,14 @@ export class WallScene {
       (m.material as THREE.Material).dispose();
     }
     this.holdMeshes.clear();
+    this.holdY.clear();
 
     const color = GRADE_COLOR[route.grade];
     for (const hold of route.holds) {
+      // The finish is not the route colour. A player who reaches the top of
+      // a route should never have to wonder whether they are done.
       const isFinish = route.finish.includes(hold.id);
-      const mesh = new THREE.Mesh(
-        holdGeometry(hold.type),
-        new THREE.MeshStandardMaterial({
-          // The finish is not the route colour. A player who reaches the top of
-          // a route should never have to wonder whether they are done.
-          color: isFinish ? '#ffffff' : color,
-          roughness: isFinish ? 0.4 : 0.62,
-          metalness: 0.04,
-          emissive: isFinish ? '#ffffff' : color,
-          emissiveIntensity: 0,
-        }),
-      );
-      this.placeHold(mesh, hold);
-      mesh.castShadow = true;
+      const mesh = this.holdMesh(hold, isFinish ? '#ffffff' : color, isFinish);
       this.holdGroup.add(mesh);
       this.holdMeshes.set(hold.id, mesh);
     }
@@ -227,18 +360,36 @@ export class WallScene {
       this.holdGroup.remove(m);
       (m.material as THREE.Material).dispose();
       this.holdMeshes.delete(id);
+      this.holdY.delete(id);
     }
     for (const hold of holds) {
       if (this.holdMeshes.has(hold.id) || hold.type === 'smear') continue;
-      const color = colorOf(hold);
-      const mesh = new THREE.Mesh(
-        holdGeometry(hold.type),
-        new THREE.MeshStandardMaterial({ color, roughness: 0.62, metalness: 0.04, emissive: color, emissiveIntensity: 0 }),
-      );
-      this.placeHold(mesh, hold);
-      mesh.castShadow = true;
+      const mesh = this.holdMesh(hold, colorOf(hold));
+      this.holdY.set(hold.id, hold.pos.y);
       this.holdGroup.add(mesh);
       this.holdMeshes.set(hold.id, mesh);
+    }
+    if (this.tread) this.clipToBelt();
+  }
+
+  /**
+   * The tread wall. Holds only exist on the belt: one set above the hood is
+   * still coming round the top roller, one under the skirt has gone.
+   */
+  setTread(on: boolean): void {
+    if (this.tread === on) return;
+    this.tread = on;
+    this.buildWall();
+    this.applyCamera();
+  }
+
+  private clipToBelt(): void {
+    const lo = this.scroll - 0.02;
+    const hi = this.scroll + PANEL + 0.02;
+    for (const [id, m] of this.holdMeshes) {
+      const h = this.route?.holds.find((x) => x.id === id);
+      const y = h ? h.pos.y : this.holdY.get(id);
+      m.visible = y === undefined || (y >= lo && y <= hi);
     }
   }
 
@@ -252,11 +403,13 @@ export class WallScene {
     const a = this.warp.point(0, 0, 0);
     const b = this.warp.point(0, -metres, 0);
     this.plane.position.set(b.x - a.x, b.y - a.y, b.z - a.z);
-    // The panels wrap every seam, so a belt that runs for an hour never runs out of wall.
-    const seam = 1.22;
+    // The belt wraps one slat at a time — every slat is the same, so the jump
+    // is invisible and a belt that runs for an hour never runs out of wall.
+    const seam = this.tread ? SLAT_LOOK.metres : CAVE_LOOK.metres;
     const wrap = Math.floor(metres / seam) * seam;
     const c = this.warp.point(0, wrap, 0);
     this.wallGroup.position.set(c.x - a.x, c.y - a.y, c.z - a.z);
+    if (this.tread) this.clipToBelt();
     this.applyCamera();
   }
 
@@ -282,6 +435,33 @@ export class WallScene {
       pad.castShadow = true;
       this.padGroup.add(pad);
     }
+  }
+
+  /** A hold's mesh: its taped colour, a little gloss, and a soft contact shadow behind it. */
+  private holdMesh(hold: Hold, color: string, finish = false): THREE.Mesh {
+    const mesh = new THREE.Mesh(
+      holdGeometry(hold.type),
+      new THREE.MeshStandardMaterial({
+        color,
+        roughness: finish ? 0.38 : 0.55,
+        metalness: 0.04,
+        emissive: color,
+        emissiveIntensity: 0,
+      }),
+    );
+    mesh.userData.sharedGeometry = true;
+    this.placeHold(mesh, hold);
+    mesh.castShadow = true;
+    if (this.blobMat) {
+      // In the hold's own frame, which is scaled to its contact radius, so
+      // the shadow is always the hold's size. A hair off the wall, under it.
+      const blob = new THREE.Mesh(this.blobGeo, this.blobMat);
+      blob.position.set(0.06, -0.12, 0.004);
+      blob.scale.setScalar(hold.type === 'volume' ? 2.3 : 2.6);
+      blob.renderOrder = -1;
+      mesh.add(blob);
+    }
+    return mesh;
   }
 
   private placeHold(mesh: THREE.Mesh, hold: Hold): void {
@@ -413,7 +593,8 @@ export class WallScene {
    */
   focusXLimit(frame: number = this.cam.frame): number {
     const halfWidth = (frame / 2) * this.camera.aspect;
-    return Math.max(0, WALL.maxX + 0.05 - halfWidth);
+    const edge = this.tread ? PANEL_HALF_WIDTH + 0.2 : WALL.maxX + 0.05;
+    return Math.max(0, edge - halfWidth);
   }
 
   /** Metres per pixel at the wall plane. Keeps drag feel consistent at any zoom. */
