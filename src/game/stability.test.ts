@@ -109,6 +109,7 @@ describe('stability: random throws never put energy into the body', () => {
   for (const id of ROUTE_IDS) {
     it(`${id}: no launches out of nowhere, no leaving the wall, no hovering`, () => {
       const st = fuzz(id);
+      // The numbers, in the test output: what a regression looks like before it fails.
       console.info(`${id}: ${JSON.stringify(st)}`);
       expect(st.throws).toBeGreaterThan(100);
       expect(st, 'body speed spikes outside a dyno').toMatchObject({ spikes: 0 });

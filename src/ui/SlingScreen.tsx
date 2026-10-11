@@ -501,7 +501,7 @@ export function SlingScreen({
       maxPump: Math.round(st.maxPump * 100) / 100,
       slips: st.slips,
       end,
-      reason: end === 'fell' && (fallCauseRef.current ?? reasonRef.current) ? (fallCauseRef.current ?? reasonRef.current)! : TREAD_END_WORDS[end],
+      reason: end === 'fell' && fallCauseRef.current ? fallCauseRef.current : TREAD_END_WORDS[end],
       at: Date.now(),
     };
   };
@@ -1010,7 +1010,7 @@ export function SlingScreen({
         endedRef.current = null;
         if (ended.outcome === 'fallen') setLanded(true);
         if (tread) {
-          const end = treadEndRef.current ?? (reasonRef.current?.startsWith('Pumped') ? 'pumped' : 'fell');
+          const end = treadEndRef.current ?? (fallCauseRef.current?.startsWith('Pumped') ? 'pumped' : 'fell');
           treadEndRef.current = end;
           stopExposure();
           onTreadEnd?.(buildRun(end));

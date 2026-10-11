@@ -12,6 +12,9 @@ name: Deploy to Pages
 on:
   push:
     branches: [main, 'claude/bouldering-puzzle-game-c770xg']
+  # Pull requests get the same checks and a downloadable build; only pushes deploy.
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -19,10 +22,10 @@ permissions:
   pages: write
   id-token: write
 
-# Never run two deploys at once, but do let a newer commit cancel a queued one.
+# Never run two deploys at once. A pull request's newer push cancels its older run.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -37,12 +40,21 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
         with:
+          path: dist
+      # A pull request's build, to download and open locally.
+      - if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bruh-build
           path: dist
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     environment:
