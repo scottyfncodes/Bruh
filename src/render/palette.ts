@@ -50,10 +50,17 @@ export const GYM = {
   wall: '#dcd8cd',
   wallDark: '#c4bfb1',
   seam: '#b0a894',
-  mat: '#3f4a63',
-  matEdge: '#333c50',
-  back: '#171a21',
-  decor: '#8e8677',
+  mat: '#34405c',
+  matEdge: '#262f45',
+  back: '#141720',
+  /** Off-route holds on the climbing wall: lighter and greyer than any tape. */
+  decor: '#b2a996',
+  /** The raised edge round the climbing wall. */
+  trim: '#3b4256',
+  /** Treadwall: brushed frame, the dark machine housings, and its colour. */
+  steel: '#9aa3b4',
+  machine: '#394052',
+  treadAccent: '#9b8cff',
   skin: '#e8b48c',
   shirt: '#e6e2da',
   shorts: '#4a5468',

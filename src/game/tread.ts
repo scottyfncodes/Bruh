@@ -65,8 +65,16 @@ export const PANEL = 4.6;
 const LOOKAHEAD = 1.6;
 /** Holds this far below the floor are gone for good. */
 const DROP = 0.6;
-/** The line stays inside this, so the wall is readable on a phone. */
-const LINE_X = 0.95;
+/**
+ * Half the belt's width, metres: the panel is 2.5 m across, which is what a
+ * commercial treadwall is. The renderer draws the belt and its frame to this,
+ * so every hold is on the belt you can see.
+ */
+export const PANEL_HALF_WIDTH = 1.25;
+/** No hold's centre goes further out than this: clear of the frame with the biggest hold on it. */
+export const HOLD_X = PANEL_HALF_WIDTH - 0.15;
+/** The line stays inside this, so the wall is readable on a phone and its holds stay on the belt. */
+const LINE_X = 0.6;
 
 export type SectionKind = 'ladder' | 'crimps' | 'pinches' | 'slopers' | 'gastons' | 'reachy' | 'underclings' | 'traverse';
 
@@ -241,7 +249,7 @@ function addSection(s: TreadSession, kind: SectionKind, level: number): void {
     s.lineX = clamp(s.lineX + drift, -LINE_X, LINE_X);
     const side = s.side;
     s.side = -s.side;
-    const x = clamp(s.lineX + side * halfWidth, -1.3, 1.3);
+    const x = clamp(s.lineX + side * halfWidth, -HOLD_X, HOLD_X);
     const { type, size, dir } = handHold(kind, lv, side, r);
     s.holds.push(hold(s.nextId++, x, y, type, size, dir));
     // A foothold a leg below, a little under the line — the worse the
@@ -255,7 +263,7 @@ function addSection(s: TreadSession, kind: SectionKind, level: number): void {
       // If the spot is taken, look a little either side of it, and a little higher.
       let placed = false;
       for (const [ox, oy] of [[0, 0], [-side * 0.16, 0], [side * 0.16, 0], [0, 0.12], [-side * 0.22, 0.1], [side * 0.24, -0.08]]) {
-        const fx = clamp(fx0 + ox, -1.35, 1.35);
+        const fx = clamp(fx0 + ox, -HOLD_X, HOLD_X);
         const fy = fy0 + oy;
         if (clear(s, fx, fy, 0.15)) {
           s.holds.push(hold(s.nextId++, fx, fy, 'foothold', round(0.095 - 0.022 * lv * (1 - 0.6 * steep))));

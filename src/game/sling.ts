@@ -166,6 +166,13 @@ export const SLING = {
   matHip: 0.5,
   /** Hip height above which the climber is considered to have left the mat. */
   leftHip: 0.92,
+  /**
+   * Longest a body with nothing held, and no dyno in the air, stays up before
+   * it is a fall, seconds. Dropping from the top of the ten-metre tower takes
+   * about one and a half; nothing legitimate keeps a climber off the mat with
+   * empty hands longer than that.
+   */
+  fallGrace: 2,
 } as const;
 
 /** Where a leg stands: the length it pushes out to when there is a foot below the hip. */
@@ -190,6 +197,63 @@ const FOOT_FLOOR = 0.03;
 const LIMB_CLEARANCE = 0.14;
 /** Furthest the torso tips from vertical while a hand is on, radians. */
 const MAX_LEAN = 0.7;
+/**
+ * How fast a torso that is already past MAX_LEAN — tumbling with nothing in
+ * its hands, then caught by a hand or a hook — is brought back inside it,
+ * radians per second. The limit is a joint limit, not a teleport: snapping a
+ * flat torso upright in one step moved the shoulder 0.4 m in 1/120 s, and the
+ * velocities read back off that were a 50 m/s launch.
+ */
+const LEAN_RECOVER = 4;
+/**
+ * The same for the limits that only apply while reaching — a standing foot's
+ * shorter leash, the press over the hands. They switch on the moment a limb
+ * is thrown; a body that is outside them then is walked inside at this speed,
+ * metres per second, rather than snapped there in one step (which read back
+ * as a 20–40 m/s jolt down).
+ */
+const REACH_TIGHTEN = 1.5;
+/**
+ * Most speed a constraint correction can leave a particle with along its
+ * push, m/s, unless it was already going that fast. Above a reach's follow
+ * (the limb flies at up to 5.2 m/s and the body goes after it), well below a
+ * launch.
+ */
+const CORRECTION_SPEED = 6;
+/**
+ * How much of a stretched reach the flying limb gives back, rather than all
+ * of it going into the body. Nearly none — the body goes after the limb — but
+ * not none: a limb that never gives fought the holds that were still pinning
+ * the body every iteration, and with both immovable the stalemate dragged
+ * the body off the edge of the wall. Kept small because it is also reach:
+ * at 0.1 the climbing bot could no longer send Read It Again (V9).
+ */
+const FOLLOW_GIVE = 0.04;
+
+/**
+ * The velocity a particle comes out of the solver with: its move this step,
+ * less any part of the correction's push that would leave it faster along
+ * that push than CORRECTION_SPEED, or than it was already going that way.
+ */
+function settledVelocity(p: Vec2, p0: Vec2, vIn: Vec2, dt: number): Vec2 {
+  const v = { x: (p.x - p0.x) / dt, y: (p.y - p0.y) / dt };
+  const cx = p.x - (p0.x + vIn.x * dt);
+  const cy = p.y - (p0.y + vIn.y * dt);
+  const c = Math.hypot(cx, cy);
+  if (c < 1e-9) return v;
+  const nx = cx / c;
+  const ny = cy / c;
+  const along = v.x * nx + v.y * ny;
+  // Up to CORRECTION_SPEED, or what it already had that way — never more on
+  // top: a correction that keeps pushing the same way every step (a tow, a
+  // stalemate) must not wind the speed up by a few m/s each step.
+  const cap = Math.max(vIn.x * nx + vIn.y * ny, CORRECTION_SPEED);
+  if (along > cap) {
+    v.x -= nx * (along - cap);
+    v.y -= ny * (along - cap);
+  }
+  return v;
+}
 /** Sideways offset a foot can carry weight from without the hips moving over it. */
 const STANCE_WIDTH = 0.26;
 /** Holds this close to where a limb was thrown from cannot catch it on the way out. */
@@ -322,6 +386,8 @@ export type SlingState = {
   holdsRef?: Hold[];
   /** Highest the hips have been since the last thing let go: how far a fall really is. */
   fallPeak?: number | null;
+  /** How long the body has had nothing held and no dyno in the air, seconds. */
+  unheldT?: number;
 };
 
 export type SlingEvent =
@@ -1037,7 +1103,16 @@ function swapOff(state: SlingState, l: SlingLimb, events: SlingEvent[]): void {
 
 // --- reach -----------------------------------------------------------------
 
-const envCache = new WeakMap<SlingState, { key: string; env: Record<string, Envelope> }>();
+/**
+ * Envelopes by what they are worked out from — the hips, shoulders and every
+ * limb's position, phase and hook — not by which state object asked. The aim
+ * preview runs every throw on a fresh copy of the body, so a cache keyed by
+ * the object missed every time and each targeted preview re-solved the
+ * envelope (about 17 ms). The key is everything envelopeOf reads, so a hit is
+ * the same answer. A handful of bodies is all an aim ever needs.
+ */
+const envCache = new Map<string, Record<string, Envelope>>();
+const ENV_CACHE_SIZE = 12;
 
 /**
  * Everywhere a limb can get to from here, with the body free to move after
@@ -1047,11 +1122,17 @@ const envCache = new WeakMap<SlingState, { key: string; env: Record<string, Enve
 export function reachEnvelope(state: SlingState, limb: LimbId): Envelope {
   const key = [state.hip.x, state.hip.y, state.shoulder.x, state.shoulder.y,
     ...LIMBS.flatMap((id) => [state.limbs[id].pos.x, state.limbs[id].pos.y, state.limbs[id].phase, state.limbs[id].hooked ? 1 : 0])].join(',');
-  let c = envCache.get(state);
-  if (!c || c.key !== key) {
-    c = { key, env: {} };
-    envCache.set(state, c);
+  let env = envCache.get(key);
+  if (env) {
+    // Most recently used goes to the back, so the oldest is the one evicted.
+    envCache.delete(key);
+    envCache.set(key, env);
+  } else {
+    env = {};
+    envCache.set(key, env);
+    if (envCache.size > ENV_CACHE_SIZE) envCache.delete(envCache.keys().next().value!);
   }
+  const c = { env };
   if (!c.env[limb]) {
     const limbs = {} as Record<LimbId, { pos: Vec2; held: boolean; hooked?: boolean }>;
     for (const id of LIMBS) {
@@ -1485,9 +1566,11 @@ export function stepSling(
   state.shoulder.x += state.shV.x * dt;
   state.shoulder.y += state.shV.y * dt;
   const tip0 = {} as Record<LimbId, Vec2>;
+  const tipV0 = {} as Record<LimbId, Vec2>;
   for (const id of LIMBS) {
     const l = state.limbs[id];
     tip0[id] = { ...l.pos };
+    tipV0[id] = { ...l.vel };
     l.prev = { ...l.pos };
     if (l.phase === 'held') continue;
     l.pos.x += l.vel.x * dt;
@@ -1500,8 +1583,17 @@ export function stepSling(
     const l = state.limbs[id];
     if (l.phase === 'held') pressTop = Math.max(pressTop ?? -Infinity, l.pos.y + REACH_PRESS);
   }
+  if (pressTop !== null) pressTop = Math.max(pressTop, sh0.y - REACH_TIGHTEN * dt);
+  // Each held foot's leash this step: never shorter than it was coming in,
+  // less what it can tighten by in a step.
+  const footIn = {} as Record<LimbId, number>;
+  for (const id of ['LF', 'RF'] as LimbId[]) footIn[id] = dist(state.limbs[id].pos, anchorFor(id, hip0, sh0));
   const corr = { LH: 0, RH: 0, LF: 0, RF: 0 } as Record<LimbId, number>;
   const footPopped = new Set<LimbId>();
+  // The lean the torso came into this step with. Inside the limit, the limit
+  // is the limit; already past it, it closes in at LEAN_RECOVER.
+  const leanIn = Math.abs(Math.atan2(sh0.x - hip0.x, sh0.y - hip0.y));
+  const leanCap = Math.max(MAX_LEAN, leanIn - LEAN_RECOVER * dt);
   const wHip = 1 / SLING.massHip;
   const wSh = 1 / SLING.massShoulder;
 
@@ -1548,7 +1640,9 @@ export function stepSling(
         }
         // A standing foot bounds a reach a little short of full stretch, so
         // the body it lets go to is one the foot can still stand under.
-        const holdL = !hand && reaching && !l.hooked ? maxL * REACH_FOOT : maxL;
+        const holdL = !hand && reaching && !l.hooked
+          ? Math.min(maxL, Math.max(maxL * REACH_FOOT, footIn[id] - REACH_TIGHTEN * dt))
+          : maxL;
         if (L > holdL) {
           const C = L - holdL;
           body.x += nx * C;
@@ -1573,7 +1667,7 @@ export function stepSling(
         // A foot going up past a high step is a hook, and the hips do not
         // climb after it: that is the old tether, the limb stopping.
         const follows = l.phase === 'flying' && reaching && (hand || l.pos.y <= state.hip.y + HIGH_STEP);
-        const toLimb = follows ? 0 : wt / wsum;
+        const toLimb = follows ? FOLLOW_GIVE : wt / wsum;
         l.pos.x -= nx * C * toLimb;
         l.pos.y -= ny * C * toLimb;
         body.x += nx * C * (1 - toLimb);
@@ -1596,10 +1690,22 @@ export function stepSling(
       const tx = state.shoulder.x - state.hip.x;
       const ty = state.shoulder.y - state.hip.y;
       const theta = Math.atan2(tx, ty);
-      if (Math.abs(theta) > MAX_LEAN) {
-        const capped = Math.sign(theta) * MAX_LEAN;
-        state.shoulder.x = state.hip.x + Math.sin(capped) * BODY.torso;
-        state.shoulder.y = state.hip.y + Math.cos(capped) * BODY.torso;
+      if (Math.abs(theta) > leanCap) {
+        // Turned about the torso's centre of mass, not about the hip: a cap
+        // that swung only the shoulder threw away every pull the hands put
+        // on it, so held hands never reached the hips and a dragged leg
+        // could tow the body metres away from them.
+        const capped = Math.sign(theta) * leanCap;
+        const wsum = wHip + wSh;
+        const cx = (state.hip.x * wSh + state.shoulder.x * wHip) / wsum;
+        const cy = (state.hip.y * wSh + state.shoulder.y * wHip) / wsum;
+        const ux = Math.sin(capped) * BODY.torso;
+        const uy = Math.cos(capped) * BODY.torso;
+        const fh = wHip / wsum; // the hip's share of the torso, measured from the centre
+        state.hip.x = cx - ux * fh;
+        state.hip.y = cy - uy * fh;
+        state.shoulder.x = cx + ux * (1 - fh);
+        state.shoulder.y = cy + uy * (1 - fh);
       }
     }
 
@@ -1639,12 +1745,23 @@ export function stepSling(
   }
 
   // --- 4. velocities from what actually happened ----------------------------
-  state.hipV = { x: (state.hip.x - hip0.x) / dt, y: (state.hip.y - hip0.y) / dt };
-  state.shV = { x: (state.shoulder.x - sh0.x) / dt, y: (state.shoulder.y - sh0.y) / dt };
+  // A correction is allowed to stop the body going somewhere and to carry it
+  // along after a limb; it is not allowed to launch it. Whatever the
+  // constraints moved the body by this step, the speed read back off that
+  // move along the push is capped at CORRECTION_SPEED (or what it had) —
+  // the positions themselves are left exactly where the solver put them.
+  // Without this, constraints that had been fighting each other (a stretched
+  // torso, a leash that just tightened) snapped back in one step when one of
+  // them let go, and the snap came out as a launch.
+  state.hipV = settledVelocity(state.hip, hip0, hipVPred, dt);
+  state.shV = settledVelocity(state.shoulder, sh0, shVPred, dt);
   for (const id of LIMBS) {
     const l = state.limbs[id];
     if (l.phase === 'held') continue;
-    l.vel = { x: (l.pos.x - tip0[id].x) / dt, y: (l.pos.y - tip0[id].y) / dt };
+    // A loose limb dragged by the body follows it, but the drag is not
+    // allowed to wind it up: a foot towed along and then towing back again
+    // was a runaway that tore the body off held hands.
+    l.vel = settledVelocity(l.pos, tip0[id], tipV0[id], dt);
     l.taut = false;
     if (l.phase !== 'flying' || state.dyno) continue;
     // Full stretch: the throw stops going sideways relative to the body.
@@ -1662,7 +1779,13 @@ export function stepSling(
     const lost = { x: (rel.x - n.x * along) * (1 - keep), y: (rel.y - n.y * along) * (1 - keep) };
     l.vel.x -= lost.x;
     l.vel.y -= lost.y;
-    // Where that went: into the body, which is what swings it round.
+    // Where that went: into the body, which is what swings it round — for a
+    // limb flying on its own momentum. A limb being steered onto a hold gets
+    // its velocity re-aimed at the hold every step (step 1), so handing its
+    // sideways part to the body each step was a push that never ran out:
+    // the body accelerated across the wall at 6 g with its hands on. The
+    // reach pose is what moves the body for those.
+    if (l.target != null) continue;
     const share = limbMass(l) / (hand ? SLING.massShoulder : SLING.massHip);
     bv.x += lost.x * share;
     bv.y += lost.y * share;
@@ -1729,10 +1852,20 @@ export function stepSling(
     const passing = state.dyno && l.vel.y > SLING.dynoPass;
     if (passing) l.touch = null;
     const aimedAt = !state.dyno && l.target != null ? map.get(l.target) : undefined;
+    // The swept segment's box. A hold further than its own contact radius
+    // from the box is further than that from the segment, so it can neither
+    // brush nor catch: skipped before any of the per-hold work. (Exactly the
+    // holds the distance test below would have rejected; nothing else.)
+    const sx0 = Math.min(l.prev.x, l.pos.x);
+    const sx1 = Math.max(l.prev.x, l.pos.x);
+    const sy0 = Math.min(l.prev.y, l.pos.y);
+    const sy1 = Math.max(l.prev.y, l.pos.y);
     for (const h of passing ? [] : aimedAt ? [aimedAt] : holds) {
+      const hr = contactRadius(h.size, h.type);
+      if (h.pos.x < sx0 - hr || h.pos.x > sx1 + hr || h.pos.y < sy0 - hr || h.pos.y > sy1 + hr) continue;
       if (blocked.has(h.id)) continue;
       if (!canUse(h.type, id)) {
-        if (closestOnSegment(h.pos, l.prev, l.pos).d <= contactRadius(h.size, h.type)) l.brushedChip = true;
+        if (closestOnSegment(h.pos, l.prev, l.pos).d <= hr) l.brushedChip = true;
         continue;
       }
       // The hold you let go of does not grab you back. Fall past it and the
@@ -1741,9 +1874,8 @@ export function stepSling(
       // Nor does the jug right next to it, while the limb is still leaving:
       // a foot thrown off a chip is not caught by the hand hold beside it.
       if (!aimedAt && l.launchAt && dist(h.pos, l.launchAt) < LAUNCH_CLEAR && dist(l.pos, l.launchAt) < LAUNCH_CLEAR + 0.08) continue;
-      const r = contactRadius(h.size, h.type);
       const { at, d } = closestOnSegment(h.pos, l.prev, l.pos);
-      if (d <= r && (!near || d < near.d)) near = { hold: h, at, d };
+      if (d <= hr && (!near || d < near.d)) near = { hold: h, at, d };
     }
 
     // A hand closes on the hold where it passes closest to it, not where it
@@ -1872,6 +2004,16 @@ export function stepSling(
     if (!anyFloor && state.hip.y > g0 + SLING.leftHip && handsOn > 0) state.left = true;
   }
 
+  // Sat down. No hand on, the hips on the mat, and a foot still on a low
+  // hold is not climbing: that foot was reading as a hook holding the body
+  // up, so the climber lay on the mat "on the wall" forever. It is a fall.
+  if (state.left && !state.dyno && handsOn === 0 && state.hip.y <= g0 + SLING.matHip) {
+    for (const id of LIMBS) {
+      const l = state.limbs[id];
+      if (l.phase === 'held') release(state, l, events, 'Sat down on the mat. Nothing in your hands holds you on.');
+    }
+  }
+
   const heldNow = LIMBS.filter((id) => state.limbs[id].phase === 'held').length;
   // Letting go of everything is a fall, unless it is a dyno, which is a jump
   // until it isn't.
@@ -1882,7 +2024,10 @@ export function stepSling(
   // Off the wall, the fall is measured from the highest the body got, not
   // from where it meets the mat.
   state.fallPeak = heldNow === 0 && state.left ? Math.max(state.fallPeak ?? -Infinity, peakOf(state)) : null;
-  if (state.left && heldNow === 0 && state.hip.y <= g0 + SLING.matHip) {
+  state.unheldT = heldNow === 0 && !state.dyno ? (state.unheldT ?? 0) + dt : 0;
+  // On the mat with nothing held is a fall; so is nothing held for longer
+  // than any real drop takes, wherever the body has got to.
+  if ((state.left && heldNow === 0 && state.hip.y <= g0 + SLING.matHip) || state.unheldT > SLING.fallGrace) {
     state.fallen = true;
     state.dyno = false;
     events.push({ kind: 'fell', at: { ...state.hip }, from: (state.fallPeak ?? peakOf(state)) - g0 });
@@ -1931,18 +2076,26 @@ function release(state: SlingState, l: SlingLimb, events: SlingEvent[], reason: 
 
 function slipReason(hold: Hold, l: SlingLimb, anchor: Vec2, state: SlingState): string {
   const label = profileOf(hold.type).label.toLowerCase();
-  const angle = loadAlignment(hold, pullDirection(hold, l, anchor));
   if (!isHand(l.id)) {
     if (hold.type === 'smear') return 'The smear skated. Hips were not over it.';
     if (wallAngleAtHold(state, hold) > 0.35) return `Foot popped off the ${label}. Steep ground needs core to keep feet on.`;
     return `Foot skated off the ${label}.`;
   }
-  if (l.heldT < ESTABLISH_TIME) return `Arrived too fast for a ${label}. Slow down into it, or deadpoint.`;
-  if (angle < 0.5) return `Wrong angle on the ${label}. Get your body under the way it pulls.`;
-  const cond = condOf(state);
-  if (cond.grip[l.id as 'LH' | 'RH'] < 0.45) return `Too pumped to hold the ${label}.`;
-  if ((l.impact ?? 0) > 0.2 || bodySpeed(state) > 1.2) return `Too much swing for a ${label}.`;
-  return `Not enough on your feet for a ${label}. It peeled.`;
+  // Each thing the capacity is made of, as how far short it fell — and the
+  // reason given is the one that fell furthest short, not the first one an
+  // if-chain happened to check. Every number here is one the step used.
+  const angle = loadAlignment(hold, pullDirection(hold, l, anchor));
+  const grip = condOf(state).grip[l.id as 'LH' | 'RH'];
+  const short: [number, string][] = [
+    [l.heldT < ESTABLISH_TIME ? 1 - l.heldT / ESTABLISH_TIME : 0, `Arrived too fast for a ${label}. Slow down into it, or deadpoint.`],
+    [clamp01((0.75 - angle) / 0.75), `Wrong angle on the ${label}. Get your body under the way it pulls.`],
+    [clamp01((0.7 - grip) / 0.7), `Too pumped to hold the ${label}. Rest on your feet first.`],
+    [Math.max(clamp01((l.impact ?? 0) / 0.4), clamp01((bodySpeed(state) - 0.6) / 1.5)), `Too much swing for a ${label}. Let the body settle first.`],
+    // Whatever the others do not explain is the load itself: too little on the feet.
+    [0.2, `Not enough on your feet for a ${label}. It peeled.`],
+  ];
+  short.sort((a, b) => b[0] - a[0]);
+  return short[0][1];
 }
 
 function wallAngleAtHold(state: SlingState, hold: Hold): number {

@@ -233,6 +233,14 @@ with one of everything on it, set so short throws, long throws, diagonals,
 misses, swings, rotation, dynos and recovery can all be tried in a minute. It
 is not graded, scored or counted.
 
+**First climb.** There is no manual before the first move. The route
+sheet says the goal in one line and the controls in two (keys on a desktop,
+touch on a phone), with the full notes behind *How climbing works*; after
+that a coach shows one tip at a time at the moment it matters — the first
+move, aiming, the first stick, the first slip, the first pump, the dyno
+when it is first ready, the moving belt — once each (`src/ui/coach.ts`).
+*Skip tips* turns them off for good.
+
 **Known limits.** The sim is planar, so the body never peels away from the
 wall in depth; a barn door is a swing, not a rotation out of the plane, and on
 a roof the body lies along the underside rather than hanging straight down
@@ -415,6 +423,18 @@ Constraints are solved in parallel and averaged, not applied in sequence.
 Sequential solving makes the answer depend on the order limbs happen to be
 stored in, which tilts a symmetric stance by twenty degrees.
 
+### The body never gains energy it was not given
+
+`src/game/stability.test.ts` throws limbs at random — far more chaotically
+than any thumb — on six routes from V0 to V10 and fails on any body speed
+gravity, a throw or a swing could not explain, hips far above the route or
+off the wall, or a climber with nothing held who does not come down.
+Position corrections in the step are allowed to stop the body and to carry
+it after a limb, never to launch it: the speed read back off a correction
+is capped along its push (`CORRECTION_SPEED`), limits that switch on at a
+throw close in at a bounded rate rather than snapping, and nothing held
+with no dyno is a fall within `SLING.fallGrace`.
+
 ### Determinism is a contract
 
 There is no randomness anywhere in move resolution. Repeat a throw from a
@@ -512,7 +532,10 @@ usually instant).
 
 **Progression.** Generated routes are scored, kept in your records and show
 personal bests, but they never move your grade or open new rungs on the board
-— a route you can reroll until it suits you does not get to do that. The
+— a route you can reroll until it suits you does not get to do that. Their
+points bank per difficulty: a fresh route at the same difficulty adds points
+only if the send beats your best there, so rerolling is for climbing, not
+for farming. The
 exception is the top of the board: V11 to V17 were set by the generator,
 validated once, and pinned in `routes.ts` by their generator ids under names
 of their own. They rebuild from the id at load, count like any board route,
@@ -584,8 +607,13 @@ their own tick list and do not open boulder grades.
 
 A wall on a belt (`src/game/tread.ts`): it rolls down as you climb, so you stay
 put and the climbing never ends. In the sim the holds are fixed and the floor
-rises at the belt's speed, which is the same thing; the renderer scrolls the
-panels so it looks like a treadwall. Three programs — Warm-up (5°), Classic
+rises at the belt's speed, which is the same thing. On screen it is its own
+machine, not the cave: a 2.5 m-wide belt of slats (`PANEL_HALF_WIDTH`) that
+rolls down between two rails, under a hood over the top roller and into a
+skirt at the floor, framed whole and held still while the belt moves. Holds
+only show on the belt — they come round from under the hood and go under the
+skirt — and the stream never sets one off it (`HOLD_X`; a test checks every
+hold against the drawn panel). Three programs — Warm-up (5°), Classic
 (15°) and Steep (30°) — each with its own belt speed and leaderboard. The belt
 never stops, not even while you aim.
 
@@ -605,6 +633,16 @@ result shows time on the wall, distance, holds caught, the hardest section
 reached, pace, time spent recovering and peak pump, against your personal best
 and a local top five per program, kept in the same local save as everything
 else.
+
+## Points, grades and the daily
+
+- Points only go up. Each route banks the most any of its sends was worth;
+  a later send adds only what beats that. The scorecard says what was
+  actually banked.
+- Your grade moves only on board routes at a grade the board has open (one
+  rung above your top). A harder route reached some other way — the daily
+  draws from V1 to V5 — scores and is remembered, but does not skip rungs.
+- The daily is three attempts, counted only for climbs started as the daily.
 
 ## What is not built
 
@@ -669,6 +707,13 @@ src/content/highball.test.ts
                            landing model, and their own tick list
 src/game/sim.test.ts       the validator's static solver and move resolution
 src/game/feel.test.ts      flow streaks, the shout, and the introductory labels
+src/game/stability.test.ts random throws on six routes, V0 to V10: no
+                           launches out of nowhere, no leaving the wall, no
+                           hovering with nothing held; and the states that
+                           used to go wrong
+src/state/progress.test.ts the daily's three attempts, grades only on open
+                           rungs, points that never go down, setter points
+                           banked per difficulty, saves repaired on load
 src/content/routes.test.ts every route: valid data, inside the wall, a start
                            that stands up, a finish near the top, actually
                            climbable, and a par a clean climb could hit

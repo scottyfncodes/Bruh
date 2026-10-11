@@ -103,6 +103,7 @@ export function surfaceStrip(
 ): THREE.BufferGeometry {
   const rows = Math.max(1, Math.ceil((y1 - y0) / dy));
   const pos: number[] = [];
+  const uv: number[] = [];
   const idx: number[] = [];
   const v = new THREE.Vector3();
   for (let r = 0; r <= rows; r++) {
@@ -110,6 +111,8 @@ export function surfaceStrip(
     for (const x of [x0, x1]) {
       warp.point(x, y, z, v);
       pos.push(v.x, v.y, v.z);
+      // UVs in wall metres, so a texture tiles at real scale however the wall bends.
+      uv.push(x, y);
     }
   }
   for (let r = 0; r < rows; r++) {
@@ -118,6 +121,7 @@ export function surfaceStrip(
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;

@@ -29,6 +29,12 @@ export type RouteRecord = {
   /** Player pinned this as something they are working. */
   project: boolean;
   lastPlayed: number;
+  /**
+   * The most points any send of this route has been worth. Points are banked
+   * against this, not against the efficiency best, so a new best can never
+   * take points away. Missing on older saves: read as `best.points`.
+   */
+  bestPoints?: number;
 };
 
 export type Profile = {
@@ -49,6 +55,12 @@ export type Profile = {
   tread: TreadRecord;
   /** Highball falls that ended off the pads or heavier than the pads were for. */
   heavyLandings: number;
+  /**
+   * The route setter's points, banked per difficulty: the most a send at that
+   * difficulty has been worth. Rerolling sets a new route, not new points —
+   * only beating your best at a difficulty adds any. Missing on older saves.
+   */
+  setterBest?: Record<string, number>;
 };
 
 export type TreadRecord = {
@@ -60,6 +72,8 @@ export type TreadRecord = {
 
 /** How many runs the tread record keeps. */
 export const TREAD_HISTORY = 40;
+/** How many route-setter routes keep a record; the oldest go first. Board routes are never pruned. */
+export const SETTER_RECORDS = 60;
 
 export function freshProfile(now = Date.now()): Profile {
   return {
@@ -139,6 +153,23 @@ export function isUnlocked(profile: Profile, grade: Grade): boolean {
 
 export type Breakthrough = { grade: Grade; previous: Grade | null };
 
+/** The points a route's sends have banked so far. */
+export function bankedPoints(rec: RouteRecord): number {
+  return rec.bestPoints ?? rec.best?.points ?? 0;
+}
+
+/**
+ * Whether a send of this route can move the player's grade. Only board
+ * routes do — not the setter's (you can reroll those until one suits you),
+ * not highballs (their own tick list) — and only at a grade the board has
+ * open: one rung above your top. A route reached some other way (the daily
+ * draws from V1 to V5 whatever you have sent) is a great send, scored and
+ * remembered, but it does not skip the rungs in between.
+ */
+export function sendCountsForGrade(profile: Profile, route: Route): boolean {
+  return !route.blueprint && route.wall !== 'tower' && isUnlocked(profile, route.grade);
+}
+
 /** Folds a completed attempt into the profile. */
 export function applySend(
   profile: Profile,
@@ -148,6 +179,7 @@ export function applySend(
 ): { profile: Profile; breakthrough: Breakthrough | null } {
   const prev = recordFor(profile, route.id);
   const better = !prev.best || card.efficiency > prev.best.efficiency;
+  const banked = bankedPoints(prev);
 
   const record: RouteRecord = {
     ...prev,
@@ -161,23 +193,36 @@ export function applySend(
     // Sending it retires it as a project.
     project: false,
     lastPlayed: card.sentAt,
+    bestPoints: Math.max(banked, card.points),
   };
 
   const prevTop = profile.topGrade;
-  // Generated routes are scored and remembered like any other, but your grade
-  // is what you have sent on the board. A route you can reroll until it suits
-  // you does not get to open the next rung.
-  // Highballs are their own tick list: a tall V4 does not open the V5s.
-  const counts = !route.blueprint && route.wall !== 'tower';
+  const counts = sendCountsForGrade(profile, route);
   const raised = counts && (prevTop === null || gradeIndex(route.grade) > gradeIndex(prevTop));
   const topGrade = raised ? route.grade : prevTop;
 
+  // Points only ever go up. A board route banks the most any of its sends
+  // was worth. A setter route banks against the best at its difficulty, so
+  // rerolling for fresh routes is for climbing, not for farming points.
+  let gained = Math.max(0, card.points - banked);
+  let setterBest = profile.setterBest;
+  if (route.blueprint) {
+    const tier = route.blueprint.difficulty;
+    const tierBest = profile.setterBest?.[tier] ?? 0;
+    gained = Math.max(0, card.points - tierBest);
+    setterBest = { ...(profile.setterBest ?? {}), [tier]: Math.max(tierBest, card.points) };
+  }
+
+  let records = { ...profile.records, [route.id]: record };
+  if (route.blueprint) records = pruneSetterRecords(records);
+
   const next: Profile = {
     ...profile,
-    records: { ...profile.records, [route.id]: record },
+    records,
     topGrade,
     totalSends: profile.totalSends + 1,
-    points: profile.points + (better ? card.points - (prev.best?.points ?? 0) : 0),
+    points: profile.points + gained,
+    ...(setterBest ? { setterBest } : {}),
   };
 
   const breakthrough =
@@ -186,6 +231,60 @@ export function applySend(
       : null;
 
   return { profile: next, breakthrough };
+}
+
+/** Keeps the newest SETTER_RECORDS route-setter records; board records are all kept. */
+function pruneSetterRecords(records: Record<string, RouteRecord>): Record<string, RouteRecord> {
+  const setter = Object.values(records).filter((r) => isSetterId(r.routeId));
+  if (setter.length <= SETTER_RECORDS) return records;
+  const drop = new Set(
+    setter.sort((a, b) => b.lastPlayed - a.lastPlayed).slice(SETTER_RECORDS).filter((r) => !r.project).map((r) => r.routeId),
+  );
+  const out: Record<string, RouteRecord> = {};
+  for (const [id, r] of Object.entries(records)) if (!drop.has(id)) out[id] = r;
+  return out;
+}
+
+/** Route-setter ids start with `gen-`. */
+export function isSetterId(id: string): boolean {
+  return id.startsWith('gen-');
+}
+
+/**
+ * Makes a loaded save safe to read: every field there with the right shape,
+ * whatever an older version, a hand-edit or a half-written save left. Keeps
+ * everything that is valid; fills in only what is missing or broken.
+ */
+export function normalizeProfile(raw: Partial<Profile>, now = Date.now()): Profile {
+  const base = freshProfile(now);
+  const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+  const records: Record<string, RouteRecord> = {};
+  if (raw.records && typeof raw.records === 'object') {
+    for (const [id, r] of Object.entries(raw.records)) {
+      if (r && typeof r === 'object') records[id] = { ...recordFor(base, id), ...r, routeId: id };
+    }
+  }
+  const tread = raw.tread && typeof raw.tread === 'object' ? raw.tread : base.tread;
+  return {
+    ...base,
+    ...raw,
+    version: SAVE_VERSION,
+    createdAt: num(raw.createdAt, base.createdAt),
+    records,
+    topGrade: raw.topGrade && (GRADES as readonly string[]).includes(raw.topGrade) ? raw.topGrade : null,
+    celebrated: Array.isArray(raw.celebrated) ? raw.celebrated : [],
+    daily: raw.daily && typeof raw.daily === 'object' ? raw.daily : null,
+    totalSends: num(raw.totalSends, 0),
+    totalFalls: num(raw.totalFalls, 0),
+    points: num(raw.points, 0),
+    totalDynos: num(raw.totalDynos, 0),
+    tread: {
+      best: tread.best && typeof tread.best === 'object' ? tread.best : {},
+      runs: Array.isArray(tread.runs) ? tread.runs : [],
+    },
+    heavyLandings: num(raw.heavyLandings, 0),
+    setterBest: raw.setterBest && typeof raw.setterBest === 'object' ? raw.setterBest : {},
+  };
 }
 
 /** Folds a failed attempt in. Falls are worth keeping — they are the project. */

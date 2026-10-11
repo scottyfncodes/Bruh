@@ -22,11 +22,13 @@ export type ResultScreenProps = {
   attempt: Attempt;
   card: ScoreCard;
   personalBest: ScoreCard | null;
+  /** Points this send actually added to the total: banked, never more than once. */
+  gained?: number;
   onAgain: () => void;
   onDone: () => void;
 };
 
-export function ResultScreen({ route, attempt, card, personalBest, onAgain, onDone }: ResultScreenProps) {
+export function ResultScreen({ route, attempt, card, personalBest, gained, onAgain, onDone }: ResultScreenProps) {
   const [tab, setTab] = useState<'score' | 'beta'>('score');
   const accent = GRADE_COLOR[route.grade];
   const beta = useMemo(() => toBeta(attempt.moves), [attempt]);
@@ -61,7 +63,7 @@ export function ResultScreen({ route, attempt, card, personalBest, onAgain, onDo
     <div className="result" style={{ ['--accent' as string]: accent }}>
       <div className="result__sheet">
         <div className="result__head">
-          <div className="result__sent">SENT</div>
+          <div className="result__sent">{card.onsight ? 'ONSIGHT' : 'SENT'}</div>
           <h1 className="result__name">
             <span className="result__grade" style={{ background: accent }}>{route.grade}</span>
             {route.name}
@@ -95,11 +97,22 @@ export function ResultScreen({ route, attempt, card, personalBest, onAgain, onDo
               <Stat label="Stuck" value={String(card.moves - card.whiffed)} sub={`of ${card.moves}`} />
               <Stat label="Time" value={formatTime(card.timeMs)} />
               <Stat label="Style" value={card.onsight ? 'Onsight' : 'Project'} />
-              <Stat label="Points" value={String(card.points)} />
+              <Stat
+                label="Points"
+                value={gained === undefined ? String(card.points) : `+${gained}`}
+                sub={gained === undefined ? undefined : gained === card.points ? 'banked' : `of ${card.points}`}
+              />
               <Stat label="Best flow" value={`×${bestFlow}`} sub="in a row" />
             </dl>
 
             {improved && <div className="result__pb">New personal best on this one.</div>}
+            {gained !== undefined && gained < card.points && (
+              <p className="result__note">
+                {gained === 0
+                  ? 'Points bank once: you have already banked this much here.'
+                  : 'Points bank once: this adds only what beats your best.'}
+              </p>
+            )}
           </>
         ) : (
           <BetaPanel beta={beta} community={community} closest={closest} />

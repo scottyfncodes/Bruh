@@ -8,7 +8,7 @@ import {
   type Breakthrough as BreakthroughData,
   applyFall, applySend, markCelebrated, onsightAvailable, recordFor, toggleProject, unlockedGrades,
 } from './state/progress';
-import { attemptsRemaining, refreshDaily } from './game/daily';
+import { attemptsRemaining, canAttemptDaily, recordDailyAttempt, refreshDaily } from './game/daily';
 import { useProfile } from './state/useProfile';
 import { SlingScreen } from './ui/SlingScreen';
 import { ResultScreen } from './ui/ResultScreen';
@@ -40,7 +40,7 @@ type Screen =
   | { kind: 'board' }
   | { kind: 'standings' }
   | { kind: 'climb'; route: Route; mode: AttemptMode; daily: boolean }
-  | { kind: 'result'; route: Route; attempt: Attempt; card: ScoreCard; best: ScoreCard | null }
+  | { kind: 'result'; route: Route; attempt: Attempt; card: ScoreCard; best: ScoreCard | null; gained?: number }
   | { kind: 'breakthrough'; data: BreakthroughData; unlocked: number }
   | { kind: 'highballs' }
   | { kind: 'treadLobby' }
@@ -136,10 +136,22 @@ export default function App() {
     else if (setter.route) prefetchRoute(setter.difficulty);
   }, [onBoard, setter.route, setter.busy, setter.error, setter.difficulty, rollRoute]);
 
+  /**
+   * Whether the climb on screen was started as the daily. Only those spend
+   * the daily's attempts — the same route climbed from the board does not.
+   */
+  const dailyRun = useRef(false);
   const startClimb = useCallback((route: Route, opts: { daily?: boolean }) => {
-    const mode: AttemptMode = onsightAvailable(profile, route.id) ? 'onsight' : 'project';
-    setScreen({ kind: 'climb', route, mode, daily: opts.daily ?? false });
-  }, [profile]);
+    // Out of daily attempts: the daily card is closed, and nothing else may open it.
+    const asDaily = !!opts.daily && route.id === daily.routeId && canAttemptDaily(daily);
+    if (opts.daily && !asDaily) return;
+    dailyRun.current = asDaily;
+    const mode: AttemptMode = onsightAvailable(profile, route.id) && (!asDaily || daily.onsightAvailable) ? 'onsight' : 'project';
+    setScreen({ kind: 'climb', route, mode, daily: asDaily });
+  }, [profile, daily]);
+
+  /** Held between the send landing and the result screen being dismissed. */
+  const pendingBreakthrough = useRef<{ data: BreakthroughData; unlocked: number } | null>(null);
 
   const handleOutcome = useCallback((attempt: Attempt, outcome: 'sent' | 'fallen') => {
     const route = routeById(attempt.routeId);
@@ -157,8 +169,8 @@ export default function App() {
       // A fall is not a screen change — the climb screen offers another go.
       update((p) => {
         const next = applyFall(p, route, attempt.moves.length);
-        return screenIsDaily(attempt, daily.routeId)
-          ? { ...next, daily: { ...daily, attemptsUsed: daily.attemptsUsed + 1, onsightAvailable: false, falls: daily.falls + 1 } }
+        return dailyRun.current && attempt.routeId === daily.routeId
+          ? { ...next, daily: recordDailyAttempt(daily, { sent: false }) }
           : next;
       });
       return;
@@ -168,33 +180,24 @@ export default function App() {
     const card = scoreAttempt(attempt, route);
     const previousBest = recordFor(profile, route.id).best;
 
+    // Worked out once, here, from the profile as it is — not inside a state
+    // updater, which React may run twice and which must not have side effects.
+    const { profile: preview, breakthrough } = applySend(profile, route, card, toBeta(attempt.moves));
+    const gained = preview.points - profile.points;
+    pendingBreakthrough.current = breakthrough
+      ? { data: breakthrough, unlocked: countNewRoutes(profile, breakthrough.grade) }
+      : null;
     update((p) => {
-      const { profile: withSend, breakthrough } = applySend(p, route, card, toBeta(attempt.moves));
+      const { profile: withSend, breakthrough: b } = applySend(p, route, card, toBeta(attempt.moves));
       let next = { ...withSend, totalDynos: withSend.totalDynos + dynos };
-      if (screenIsDaily(attempt, daily.routeId)) {
-        next = {
-          ...next,
-          daily: {
-            ...daily,
-            attemptsUsed: daily.attemptsUsed + 1,
-            sent: true,
-            bestMoves: daily.bestMoves === null ? card.moves : Math.min(daily.bestMoves, card.moves),
-            bestEfficiency: Math.max(daily.bestEfficiency ?? 0, card.efficiency),
-            onsightAvailable: false,
-          },
-        };
+      if (dailyRun.current && attempt.routeId === daily.routeId) {
+        next = { ...next, daily: recordDailyAttempt(daily, { sent: true, moves: card.moves, efficiency: card.efficiency }) };
       }
-      if (breakthrough) {
-        next = markCelebrated(next, breakthrough.grade);
-        pendingBreakthrough.current = {
-          data: breakthrough,
-          unlocked: countNewRoutes(p, next.topGrade),
-        };
-      }
+      if (b) next = markCelebrated(next, b.grade);
       return next;
     });
 
-    setScreen({ kind: 'result', route, attempt, card, best: previousBest });
+    setScreen({ kind: 'result', route, attempt, card, best: previousBest, gained });
   }, [profile, update, daily]);
 
   const closeResult = useCallback(() => {
@@ -254,7 +257,7 @@ export default function App() {
           mode="project"
           fitness={fitnessFor(profile.topGrade, profile.totalSends)}
           onExit={() => setScreen({ kind: 'treadLobby' })}
-          onOutcome={() => undefined}
+          onOutcome={ignoreOutcome}
           tread={screen.session}
           treadBest={profile.tread?.best[screen.session.program.id] ?? null}
           onTreadEnd={endTread}
@@ -287,6 +290,7 @@ export default function App() {
           onOutcome={handleOutcome}
           onLanding={onLanding}
           attemptsNote={screen.daily ? `daily · ${left} left` : undefined}
+          retriesLeft={screen.daily ? left : undefined}
         />
       );
     }
@@ -298,6 +302,7 @@ export default function App() {
           attempt={screen.attempt}
           card={screen.card}
           personalBest={screen.best}
+          gained={screen.gained}
           onAgain={() => startClimb(screen.route, {})}
           onDone={closeResult}
         />
@@ -315,14 +320,13 @@ export default function App() {
   }
 }
 
-/** Held between the send landing and the result screen being dismissed. */
-const pendingBreakthrough: { current: { data: BreakthroughData; unlocked: number } | null } = {
-  current: null,
-};
 
-function screenIsDaily(attempt: Attempt, dailyRouteId: string): boolean {
-  return attempt.routeId === dailyRouteId;
-}
+/**
+ * The tread wall reports through onTreadEnd, not onOutcome. A fixed function
+ * rather than an inline one: the climb screen's frame loop depends on it, and
+ * a new one each render restarted the loop on every App render.
+ */
+function ignoreOutcome(): void {}
 
 /** How many routes appear on the board that were not there before. */
 function countNewRoutes(before: Parameters<typeof unlockedGrades>[0], afterTop: Grade | null): number {

@@ -19,7 +19,12 @@ import './sling.css';
  *
  * Grades open one rung above whatever you have actually sent, so there is
  * always exactly one row of routes you have no business trying yet, clearly
- * visible, which is how a bouldering gym works.
+ * visible, which is how a bouldering gym works. The rungs above that are one
+ * line, not a dozen greyed-out rows.
+ *
+ * A new player sees the practice wall first, marked as the place to start,
+ * and the V0s straight under it; the daily and the route setter come after.
+ * Once something is sent, the daily moves up to where a regular looks first.
  */
 
 export type RouteListProps = {
@@ -52,6 +57,39 @@ export function RouteList({
   const projects = ROUTES.filter((r) => recordFor(profile, r.id).project);
   const dailyRoute = routeById(daily.routeId);
   const left = attemptsRemaining(daily);
+  const newcomer = profile.totalSends === 0;
+  // Every open grade, and the one rung above them; the rest is one line.
+  const withRoutes = GRADES.filter((g) => (byGrade.get(g) ?? []).length > 0);
+  const firstLocked = withRoutes.findIndex((g) => !isUnlocked(profile, g));
+  const shownGrades = firstLocked < 0 ? withRoutes : withRoutes.slice(0, firstLocked + 1);
+  const lockedAbove = withRoutes.length - shownGrades.length;
+  // The daily's onsight is only live if the route has never been tried, from anywhere.
+  const dailyOnsight = !!dailyRoute && daily.onsightAvailable && onsightAvailable(profile, dailyRoute.id);
+  const outOfDaily = left === 0;
+
+  const dailyCard = dailyRoute && (
+    <button
+      className="daily"
+      disabled={outOfDaily}
+      onClick={() => onClimb(dailyRoute, { daily: true })}
+    >
+      <div className="daily__tag">Daily climb · {left}/3 left</div>
+      <div className="daily__name">
+        <span className="chip" style={{ background: GRADE_COLOR[dailyRoute.grade] }}>
+          {dailyRoute.grade}
+        </span>
+        {dailyRoute.name}
+      </div>
+      <div className="daily__meta">
+        {daily.sent
+          ? `Sent — ${daily.bestMoves} moves, ${Math.round((daily.bestEfficiency ?? 0) * 100)}% efficiency${outOfDaily ? '. Back tomorrow.' : ''}`
+          : !outOfDaily
+            ? `Same route for everyone today. Three tries${dailyOnsight ? ' · onsight live' : ''}.`
+            : 'Out of attempts. A new one tomorrow.'}
+        {!isUnlocked(profile, dailyRoute.grade) && !daily.sent && !outOfDaily && ' Above your grade: a send scores, but opens no rungs.'}
+      </div>
+    </button>
+  );
 
   return (
     <div className="board">
@@ -74,42 +112,18 @@ export function RouteList({
 
       <ModeTabs mode="boulder" onMode={onMode} />
 
-      <button className="lab" onClick={() => onClimb(SLING_LAB, {})}>
-        <div className="lab__tag">Practice wall</div>
+      <button className={`lab${newcomer ? ' lab--start' : ''}`} onClick={() => onClimb(SLING_LAB, {})}>
+        <div className="lab__tag">{newcomer ? 'Start here · practice wall' : 'Practice wall'}</div>
         <div className="lab__name">{SLING_LAB.name}</div>
-        <div className="lab__meta">{SLING_LAB.tagline} Not graded, not scored, not counted.</div>
+        <div className="lab__meta">
+          {newcomer
+            ? 'A minute to learn the throw: one of every move, nothing counted. Then try a V0.'
+            : `${SLING_LAB.tagline} Not graded, not scored, not counted.`}
+        </div>
+        {newcomer && <span className="lab__go">Try it</span>}
       </button>
 
-      {dailyRoute && (
-        <button
-          className="daily"
-          disabled={left === 0 && !daily.sent}
-          onClick={() => onClimb(dailyRoute, { daily: true })}
-        >
-          <div className="daily__tag">Daily climb</div>
-          <div className="daily__name">
-            <span className="chip" style={{ background: GRADE_COLOR[dailyRoute.grade] }}>
-              {dailyRoute.grade}
-            </span>
-            {dailyRoute.name}
-          </div>
-          <div className="daily__meta">
-            {daily.sent
-              ? `Sent — ${daily.bestMoves} moves, ${Math.round((daily.bestEfficiency ?? 0) * 100)}% efficiency`
-              : left > 0
-                ? `${left} attempt${left === 1 ? '' : 's'} remaining${daily.onsightAvailable ? ' · onsight live' : ''}`
-                : 'Out of attempts. Back tomorrow.'}
-          </div>
-        </button>
-      )}
-
-      <RouteSetter
-        state={setter}
-        profile={profile}
-        onPick={onSetterPick}
-        onReroll={onSetterReroll}
-        onClimb={(r) => onClimb(r, {})}
-      />
+      {!newcomer && dailyCard}
 
       <nav className="board__tabs">
         <button className={tab === 'board' ? 'is-on' : ''} onClick={() => setTab('board')}>
@@ -137,35 +151,51 @@ export function RouteList({
           )}
         </section>
       ) : (
-        GRADES.map((grade) => {
-          const routes = byGrade.get(grade);
-          if (!routes || routes.length === 0) return null;
-          const open = isUnlocked(profile, grade);
-          return (
-            <section key={grade} className={`gradeblock${open ? '' : ' is-locked'}`}>
-              <h2 className="gradeblock__head">
-                <span className="chip" style={{ background: GRADE_COLOR[grade] }}>{grade}</span>
-                <span className="gradeblock__count">
-                  {open
-                    ? `${routes.filter((r) => recordFor(profile, r.id).sent).length}/${routes.length} sent`
-                    : `send a ${GRADES[GRADES.indexOf(grade) - 1]} to open`}
-                </span>
-              </h2>
-              {open && (
-                <div className="board__list">
-                  {routes.map((r) => (
-                    <RouteCard
-                      key={r.id} route={r} profile={profile}
-                      onClimb={() => onClimb(r, {})}
-                      onToggleProject={() => onToggleProject(r.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          );
-        })
+        <>
+          {shownGrades.map((grade) => {
+            const routes = byGrade.get(grade) ?? [];
+            const open = isUnlocked(profile, grade);
+            return (
+              <section key={grade} className={`gradeblock${open ? '' : ' is-locked'}`}>
+                <h2 className="gradeblock__head">
+                  <span className="chip" style={{ background: GRADE_COLOR[grade] }}>{grade}</span>
+                  <span className="gradeblock__count">
+                    {open
+                      ? `${routes.filter((r) => recordFor(profile, r.id).sent).length}/${routes.length} sent`
+                      : `send a ${GRADES[GRADES.indexOf(grade) - 1]} to open`}
+                  </span>
+                </h2>
+                {open && (
+                  <div className="board__list">
+                    {routes.map((r) => (
+                      <RouteCard
+                        key={r.id} route={r} profile={profile}
+                        onClimb={() => onClimb(r, {})}
+                        onToggleProject={() => onToggleProject(r.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+          {lockedAbove > 0 && (
+            <p className="board__locked">
+              {lockedAbove} more grade{lockedAbove === 1 ? '' : 's'} above, up to V17 — each opens when you send the one below.
+            </p>
+          )}
+        </>
       )}
+
+      {newcomer && dailyCard}
+
+      <RouteSetter
+        state={setter}
+        profile={profile}
+        onPick={onSetterPick}
+        onReroll={onSetterReroll}
+        onClimb={(r) => onClimb(r, {})}
+      />
 
       <footer className="board__foot">
         Read the route. Plan your beta. Throw your limbs at the wall.
@@ -188,7 +218,7 @@ function RouteCard({
   const assessment = assessmentOf(route.id);
 
   return (
-    <div className={`card${rec.sent ? ' is-sent' : ''}`}>
+    <div className={`card${rec.sent ? ' is-sent' : ''}`} style={{ ['--tape' as string]: GRADE_COLOR[route.grade] }}>
       <button className="card__main" onClick={onClimb}>
         <div className="card__top">
           <span className="card__name">{route.name}</span>

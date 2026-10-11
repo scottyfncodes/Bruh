@@ -11,7 +11,7 @@
 }
 .brk__inner { text-align: center; max-width: 24rem; }
 .brk__kicker {
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   font-weight: 800;
   letter-spacing: 0.34em;
   text-transform: uppercase;

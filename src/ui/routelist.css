@@ -17,6 +17,7 @@
   border-bottom: 1px solid var(--line);
 }
 .board__grade {
+  font-family: var(--font-display);
   font-size: 2.6rem;
   font-weight: 900;
   line-height: 1;
@@ -26,7 +27,7 @@
   gap: 0.5rem;
 }
 .board__gradenote {
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   font-weight: 500;
   color: var(--ink-faint);
   letter-spacing: 0;
@@ -42,27 +43,28 @@
   cursor: pointer;
 }
 .board__tally div { display: flex; flex-direction: column; }
-.board__tally b { font-size: 1.05rem; }
-.board__tally span { font-size: 0.64rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; }
+.board__tally b { font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
+.board__tally span { font-size: 0.6875rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; }
+.board__tally { min-height: var(--tap); }
 
 .daily {
   display: block;
   width: 100%;
   text-align: left;
-  margin: 1rem 0 0.4rem;
+  margin: 0.75rem 0 0.4rem;
   padding: 0.9rem 1rem;
-  border: 1px solid var(--line-strong);
+  border: 1px solid color-mix(in srgb, var(--daily) 40%, transparent);
   border-radius: var(--r-lg);
-  background: linear-gradient(140deg, rgba(95, 209, 160, 0.14), rgba(25, 28, 36, 0.9));
+  background: linear-gradient(140deg, color-mix(in srgb, var(--daily) 16%, var(--bg-raised)), var(--bg-raised));
   cursor: pointer;
 }
-.daily:disabled { opacity: 0.5; cursor: default; }
+.daily:disabled { opacity: 0.55; cursor: default; }
 .daily__tag {
-  font-size: 0.64rem;
-  font-weight: 800;
+  font-size: var(--fs-xs);
+  font-weight: 900;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--good);
+  color: var(--daily);
 }
 .daily__name {
   display: flex;
@@ -72,14 +74,14 @@
   font-size: 1.15rem;
   font-weight: 700;
 }
-.daily__meta { margin-top: 0.25rem; font-size: 0.78rem; color: var(--ink-dim); }
+.daily__meta { margin-top: 0.25rem; font-size: var(--fs-sm); line-height: 1.4; color: var(--ink-dim); }
 
 .chip {
   padding: 0.12rem 0.42rem;
   border-radius: 0.3rem;
-  font-size: 0.7rem;
-  font-weight: 800;
-  color: #11141a;
+  font-size: var(--fs-xs);
+  font-weight: 900;
+  color: #0e1117;
 }
 
 .board__tabs {
@@ -92,10 +94,11 @@
   appearance: none;
   border: 0;
   background: none;
+  min-height: var(--tap);
   padding: 0.6rem 0.15rem;
   margin-right: 1rem;
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: var(--fs-md);
+  font-weight: 700;
   color: var(--ink-faint);
   cursor: pointer;
   border-bottom: 2px solid transparent;
@@ -108,11 +111,11 @@
   padding: 0.05rem 0.35rem;
   border-radius: 0.6rem;
   background: var(--line-strong);
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
 }
 
 .gradeblock { margin-bottom: 1.5rem; }
-.gradeblock.is-locked { opacity: 0.42; }
+.gradeblock.is-locked { opacity: 0.6; }
 .gradeblock__head {
   display: flex;
   align-items: center;
@@ -121,8 +124,8 @@
   font-size: 0.9rem;
 }
 .gradeblock__count {
-  font-size: 0.7rem;
-  font-weight: 500;
+  font-size: var(--fs-xs);
+  font-weight: 600;
   color: var(--ink-faint);
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -141,10 +144,13 @@
   display: flex;
   align-items: stretch;
   border: 1px solid var(--line);
+  border-left: 4px solid var(--tape, var(--line-strong));
   border-radius: var(--r-md);
   background: var(--bg-raised);
   overflow: hidden;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
+.card:active { background: var(--panel); }
 .card.is-sent { border-color: rgba(95, 209, 160, 0.35); }
 .card__main {
   flex: 1;
@@ -157,11 +163,11 @@
   cursor: pointer;
 }
 .card__top { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-.card__name { font-size: 0.98rem; font-weight: 650; }
+.card__name { font-size: var(--fs-md); font-weight: 750; }
 .card__badge {
-  padding: 0.1rem 0.34rem;
+  padding: 0.1rem 0.36rem;
   border-radius: 0.25rem;
-  font-size: 0.58rem;
+  font-size: 0.6875rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   background: rgba(95, 209, 160, 0.18);
@@ -169,8 +175,8 @@
 }
 .card__badge--onsight { background: rgba(255, 215, 94, 0.18); color: #ffd75e; }
 .card__badge--fresh { background: transparent; color: var(--ink-faint); border: 1px solid var(--line-strong); }
-.card__setter { margin-top: 0.15rem; font-size: 0.75rem; color: var(--ink-faint); }
-.card__meta { margin-top: 0.35rem; font-size: 0.73rem; color: var(--ink-dim); }
+.card__setter { margin-top: 0.15rem; font-size: var(--fs-xs); color: var(--ink-faint); }
+.card__meta { margin-top: 0.35rem; font-size: var(--fs-xs); color: var(--ink-dim); }
 .card__pin {
   flex: none;
   width: 3rem;
@@ -183,10 +189,20 @@
 }
 .card__pin.is-on { color: #ffd75e; }
 
+.board__locked {
+  margin: -0.4rem 0 1.2rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+
 .board__foot {
   margin-top: 2rem;
   text-align: center;
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   color: var(--ink-faint);
   line-height: 1.6;
 }
@@ -208,7 +224,7 @@
 /* The model's second opinion: the moves' grade, and what kind of climbing it is. */
 .card__assess {
   margin-top: 0.22rem;
-  font-size: 0.68rem;
+  font-size: var(--fs-xs);
   color: var(--ink-faint);
   text-transform: lowercase;
 }
