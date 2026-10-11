@@ -6,8 +6,10 @@ import './title.css';
 /**
  * The front door.
  *
- * One hero, one wordmark, one button. The three-step strip underneath is the
- * entire manual, because the entire game is one gesture repeated.
+ * A lit patch of climbing wall with Bernie on it, the wordmark stuck on like
+ * a sticker, one button. The three-step strip underneath is the entire
+ * manual, because the entire game is one gesture repeated — and the board
+ * the button opens puts the practice wall and the first V0s right at the top.
  */
 export function Title({
   profile, onStart, onStandings,
@@ -29,7 +31,11 @@ export function Title({
 
   return (
     <div className="title">
-      <div className="title__wall" aria-hidden="true" />
+      <div className="title__wall" aria-hidden="true">
+        {HOLDS.map((h, i) => (
+          <i key={i} className="title__hold" style={{ left: `${h.x}%`, top: `${h.y}%`, width: `${h.s}rem`, height: `${h.s * 0.82}rem`, background: h.c, transform: `rotate(${h.r}deg)` }} />
+        ))}
+      </div>
       <div className="title__glow" aria-hidden="true" />
 
       <div className="title__inner">
@@ -40,8 +46,7 @@ export function Title({
         <div className="title__kicker">Fling · Stick · Send</div>
         <h1 className="title__mark">BRUH</h1>
         <p className="title__tag">
-          A bouldering game where you throw your limbs at the wall one at a time
-          and the rest of you has to deal with it.
+          Throw your limbs at the wall, one at a time. The rest of Bernie has to deal with it.
         </p>
 
         <button className="btn btn--primary title__go" onClick={onStart}>
@@ -100,3 +105,14 @@ export function Title({
     </div>
   );
 }
+
+/** The holds on the title wall: a few problems' worth of tape colours. */
+const HOLDS = [
+  { x: 9, y: 14, s: 2.2, c: '#5fd1a0', r: 12 },
+  { x: 80, y: 9, s: 1.8, c: '#57b6e8', r: -20 },
+  { x: 86, y: 34, s: 2.6, c: '#f2c249', r: 30 },
+  { x: 4, y: 42, s: 1.6, c: '#e8564f', r: -8 },
+  { x: 70, y: 52, s: 1.4, c: '#c05ce0', r: 45 },
+  { x: 18, y: 60, s: 1.9, c: '#57b6e8', r: 4 },
+  { x: 48, y: 4, s: 1.5, c: '#f08a3c', r: -35 },
+];

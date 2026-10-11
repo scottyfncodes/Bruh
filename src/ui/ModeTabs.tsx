@@ -9,7 +9,7 @@ export type ClimbMode = 'boulder' | 'highball' | 'tread';
 export const MODE_COLOR: Record<ClimbMode, string> = {
   boulder: '#5fd1a0',
   highball: '#f2a13c',
-  tread: '#9b8cff',
+  tread: '#a596ff',
 };
 
 const MODES: { id: ClimbMode; name: string; sub: string }[] = [

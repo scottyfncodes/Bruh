@@ -561,8 +561,20 @@ function drawRuler(input: SlingOverlayInput): void {
     ctx.lineTo(major ? X + 6 : X, a.y);
     ctx.stroke();
     if (major) {
-      ctx.fillStyle = '#f2c249';
-      ctx.fillText(`${m} m`, X + 9, a.y);
+      // On a dark tab, so the mark reads on the pale wall.
+      const label = `${m} m`;
+      const w = ctx.measureText(label).width + 10;
+      ctx.globalAlpha = 0.9;
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(12,14,20,0.82)';
+      ctx.beginPath();
+      // roundRect is Safari 16+; a plain tab is fine anywhere older.
+      if (ctx.roundRect) ctx.roundRect(X + 6, a.y - 9, w, 18, 5);
+      else ctx.rect(X + 6, a.y - 9, w, 18);
+      ctx.fill();
+      ctx.fillStyle = '#f7c661';
+      ctx.fillText(label, X + 11, a.y);
+      ctx.shadowBlur = 3;
     }
   }
   const c = scene.project({ x: ruler.x, y: ruler.climber }, 0);

@@ -37,6 +37,15 @@ export const CAVE_LOOK: WallLook = {
   seam: { color: '#a59a83', width: 0.012, rows: true, cols: true },
 };
 
+/**
+ * The highball tower: the same plywood, painted a cool pale grey, with the
+ * panel seams stronger — a different wall, two storeys of it, at a glance.
+ */
+export const TOWER_LOOK: WallLook = {
+  base: '#d3d8dc', grain: 0.25, nut: '#5d646c', chalk: 0.7, metres: 1.22, pitch: 0.2,
+  seam: { color: '#8c949c', width: 0.016, rows: true, cols: true },
+};
+
 /** The walls either side of the climbing area: painted dark, out of the way. */
 export const SIDE_LOOK: WallLook = {
   base: '#2b3040', grain: 0.2, nut: '#1c1f2a', chalk: 0, metres: 1.22, pitch: 0.2,

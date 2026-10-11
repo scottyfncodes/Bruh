@@ -8,27 +8,50 @@
 .flash--slip .flash__grade { color: #ff8f3c; }
 
 .lab {
+  position: relative;
   display: block;
   width: 100%;
-  margin: 0 0 1rem;
+  margin: 1rem 0 0;
   padding: 0.85rem 1rem;
-  border: 1px dashed #00e5ff;
-  border-radius: 0.9rem;
-  background: rgba(0, 229, 255, 0.06);
+  border: 1px dashed color-mix(in srgb, var(--lab) 70%, transparent);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--lab) 7%, var(--bg-raised));
   color: var(--ink);
   text-align: left;
   font: inherit;
   cursor: pointer;
 }
 .lab__tag {
-  font-size: 0.66rem;
-  font-weight: 700;
+  font-size: var(--fs-xs);
+  font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #00e5ff;
+  color: var(--lab);
 }
-.lab__name { margin-top: 0.15rem; font-size: 1.05rem; font-weight: 700; }
-.lab__meta { margin-top: 0.25rem; font-size: 0.78rem; color: var(--ink-dim); }
+.lab__name { margin-top: 0.15rem; font-size: var(--fs-lg); font-weight: 800; }
+.lab__meta { margin-top: 0.25rem; font-size: var(--fs-sm); line-height: 1.4; color: var(--ink-dim); }
+/* For a first visit: the place to start, said plainly. */
+.lab--start {
+  padding: 1rem 1rem 1.05rem;
+  border-style: solid;
+  border-color: var(--lab);
+  background:
+    radial-gradient(circle, rgba(63, 212, 232, 0.16) 1.2px, transparent 1.8px) 0 0 / 1.1rem 1.1rem,
+    linear-gradient(140deg, color-mix(in srgb, var(--lab) 20%, var(--bg-raised)), var(--bg-raised));
+  box-shadow: 0 0 1.6rem -0.6rem color-mix(in srgb, var(--lab) 80%, transparent);
+}
+.lab--start .lab__meta { padding-right: 5.5rem; }
+.lab__go {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: var(--r-sm);
+  background: var(--lab);
+  color: #0e1117;
+  font-size: var(--fs-sm);
+  font-weight: 900;
+}
 
 /* --- the pump --- */
 

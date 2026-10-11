@@ -23,9 +23,9 @@
   border-color: var(--mode);
   background: color-mix(in srgb, var(--mode) 14%, var(--bg-raised));
 }
-.modes__name { font-size: 0.86rem; font-weight: 800; color: var(--ink); }
+.modes__name { font-size: var(--fs-md); font-weight: 800; color: var(--ink); }
 .modes__tab.is-on .modes__name { color: var(--mode); }
-.modes__sub { font-size: 0.64rem; color: var(--ink-faint); }
+.modes__sub { font-size: 0.6875rem; color: var(--ink-faint); }
 
 /* --- shared bits of the mode boards --- */
 
@@ -109,11 +109,11 @@
 .program__angle { font-size: 1.35rem; font-weight: 900; color: #9b8cff; min-width: 2.6rem; }
 .program__body { flex: 1; min-width: 0; }
 .program__name { font-size: 0.95rem; font-weight: 700; }
-.program__blurb { font-size: 0.72rem; color: var(--ink-dim); margin-top: 0.15rem; }
-.program__pb { text-align: right; font-size: 0.68rem; color: var(--ink-faint); white-space: nowrap; }
+.program__blurb { font-size: var(--fs-xs); color: var(--ink-dim); margin-top: 0.15rem; }
+.program__pb { text-align: right; font-size: 0.6875rem; color: var(--ink-faint); white-space: nowrap; }
 .program__pb b { display: block; font-size: 0.95rem; color: var(--ink); font-variant-numeric: tabular-nums; }
 
-.btn.treadgo { display: block; width: 100%; margin-top: 1rem; background: #9b8cff; }
+.btn.treadgo { display: block; width: 100%; margin-top: 1rem; background: var(--tread); box-shadow: 0 0.5rem 1.4rem -0.5rem color-mix(in srgb, var(--tread) 70%, transparent); }
 
 .lboard { width: 100%; border-collapse: collapse; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
 .lboard td { padding: 0.45rem 0.3rem; border-bottom: 1px solid var(--line); color: var(--ink-dim); }
@@ -155,8 +155,8 @@
   background: var(--bg-raised);
 }
 .treadres__stat b { display: block; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
-.treadres__stat span { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); }
+.treadres__stat span { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); }
 .treadres__compare { font-size: 0.75rem; color: var(--ink-dim); margin-bottom: 1rem; }
 .treadres__row { display: flex; gap: 0.6rem; margin-top: auto; }
 .treadres__row .btn { flex: 1; }
-.treadres__row .btn--primary { background: #9b8cff; }
+.treadres__row .btn--primary { background: var(--tread); box-shadow: none; }

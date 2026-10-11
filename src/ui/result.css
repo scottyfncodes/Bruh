@@ -2,7 +2,9 @@
   position: fixed;
   inset: 0;
   overflow-y: auto;
-  background: var(--bg-sunk);
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+    var(--bg-sunk);
   touch-action: pan-y;
 }
 .result__sheet {
@@ -13,18 +15,30 @@
 }
 .result__head { text-align: center; }
 .result__sent {
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.34em;
-  color: var(--accent);
-  margin-left: 0.34em;
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #fff;
+  -webkit-text-stroke: 2px #0e1117;
+  paint-order: stroke fill;
+  text-shadow: 0 0.25rem 0 var(--accent), 0 0.6rem 1.6rem rgba(0, 0, 0, 0.5);
+  transform: rotate(-4deg);
+  animation: sentStamp 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
+@keyframes sentStamp {
+  0% { opacity: 0; transform: scale(2.2) rotate(-10deg); }
+  100% { opacity: 1; transform: rotate(-4deg); }
+}
+.result__note { margin: 0.7rem 0 0; font-size: var(--fs-xs); color: var(--ink-faint); text-align: center; }
 .result__name {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  margin: 0.45rem 0 0;
+  margin: 0.9rem 0 0;
   font-size: 1.5rem;
   letter-spacing: -0.015em;
 }
@@ -35,7 +49,7 @@
   font-weight: 800;
   color: #11141a;
 }
-.result__verdict { margin: 0.4rem 0 0; font-size: 0.88rem; color: var(--ink-dim); }
+.result__verdict { margin: 0.4rem 0 0; font-size: var(--fs-md); color: var(--ink-dim); }
 
 .result__tabs {
   display: flex;
@@ -52,12 +66,13 @@
   background: none;
   padding: 0.55rem;
   border-radius: calc(var(--r-md) - 0.2rem);
-  font-size: 0.85rem;
-  font-weight: 600;
+  min-height: 2.6rem;
+  font-size: var(--fs-sm);
+  font-weight: 700;
   color: var(--ink-faint);
   cursor: pointer;
 }
-.result__tabs .is-on { background: var(--bg); color: var(--ink); }
+.result__tabs .is-on { background: var(--panel); color: var(--ink); }
 
 .effring { position: relative; width: 9.5rem; height: 9.5rem; margin: 0.5rem auto 1.4rem; }
 .effring__svg { width: 100%; height: 100%; transform: rotate(-90deg); }
@@ -70,6 +85,7 @@
   transition: stroke-dasharray 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .effring__num {
+  font-family: var(--font-display);
   position: absolute;
   inset: 0;
   display: grid;
@@ -82,7 +98,7 @@
   position: absolute;
   inset: auto 0 2.4rem;
   text-align: center;
-  font-size: 0.64rem;
+  font-size: 0.6875rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--ink-faint);
@@ -116,7 +132,7 @@
   100% { opacity: 1; transform: none; }
 }
 .stats__item dd { margin: 0.2rem 0 0; font-size: 1.15rem; font-weight: 700; }
-.stats__sub { margin-left: 0.3rem; font-size: 0.68rem; font-weight: 500; color: var(--ink-faint); }
+.stats__sub { margin-left: 0.3rem; font-size: 0.6875rem; font-weight: 500; color: var(--ink-faint); }
 
 .result__pb {
   margin-top: 0.9rem;
@@ -177,7 +193,7 @@
 
 .beta__caveat {
   margin: 0.9rem 0 0;
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   line-height: 1.5;
   color: var(--ink-faint);
 }

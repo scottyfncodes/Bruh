@@ -9,24 +9,32 @@
   color: var(--ink);
 }
 
-/* The wall, faintly: panel seams and a slow tilt so the page has depth. */
+/* The wall: lit plywood with its T-nut grid, a spotlight on the middle of
+   it, falling away into the dark of the gym. The same wall as the game's. */
 .title__wall {
   position: absolute;
-  inset: -20%;
+  inset: -12% -20% 30%;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px) 0 0 / 100% 132px,
-    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px) 0 0 / 132px 100%,
-    linear-gradient(160deg, #1b1f28 0%, #12141a 55%, #0c0e12 100%);
-  transform: perspective(900px) rotateX(8deg) translateY(-2%);
+    radial-gradient(circle, rgba(70, 58, 42, 0.55) 1.5px, transparent 2.2px) 0 0 / 1.6rem 1.6rem,
+    linear-gradient(rgba(120, 100, 70, 0.35) 1px, transparent 1px) 0 0 / 100% 9.8rem,
+    linear-gradient(90deg, rgba(120, 100, 70, 0.35) 1px, transparent 1px) 0 0 / 9.8rem 100%,
+    linear-gradient(180deg, #e4dccb, #d9cfba);
+  transform: perspective(900px) rotateX(10deg);
   transform-origin: 50% 100%;
+  -webkit-mask-image: radial-gradient(ellipse 70% 62% at 50% 42%, #000 35%, transparent 78%);
+  mask-image: radial-gradient(ellipse 70% 62% at 50% 42%, #000 35%, transparent 78%);
+}
+.title__hold {
+  position: absolute;
+  border-radius: 46% 54% 42% 58% / 55% 45% 55% 45%;
+  box-shadow: inset -0.2rem -0.3rem 0 rgba(0, 0, 0, 0.18), inset 0.15rem 0.2rem 0 rgba(255, 255, 255, 0.25), 0.25rem 0.45rem 0.6rem rgba(40, 30, 20, 0.35);
 }
 .title__glow {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 60% 42% at 50% 34%, rgba(95, 209, 160, 0.22), transparent 70%),
-    radial-gradient(ellipse 40% 30% at 82% 88%, rgba(0, 229, 255, 0.1), transparent 70%),
-    radial-gradient(ellipse 45% 35% at 12% 92%, rgba(255, 143, 60, 0.1), transparent 70%);
+    radial-gradient(ellipse 55% 30% at 50% 26%, rgba(255, 240, 210, 0.16), transparent 70%),
+    linear-gradient(180deg, transparent 30%, rgba(16, 18, 26, 0.9) 47%, #10121a 60%);
   pointer-events: none;
 }
 
@@ -46,12 +54,12 @@
   width: min(15rem, 44vh);
   aspect-ratio: 1;
   margin: 0 auto 0.4rem;
-  border-radius: 28%;
+  border-radius: 26%;
   overflow: hidden;
   box-shadow:
-    0 30px 60px -20px rgba(0, 0, 0, 0.8),
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    0 0 0 4px #0e1117,
+    0 0 0 7px #f3f4f7,
+    0 30px 60px -18px rgba(0, 0, 0, 0.75);
   animation: heroBob 5.5s ease-in-out infinite;
 }
 .title__hero::after {
@@ -75,28 +83,30 @@
 
 .title__kicker {
   margin-top: 1.1rem;
-  font-size: 0.68rem;
-  font-weight: 800;
+  font-size: var(--fs-xs);
+  font-weight: 900;
   letter-spacing: 0.32em;
   text-transform: uppercase;
   color: var(--good);
 }
 .title__mark {
-  margin: 0.15rem 0 0;
-  font-size: clamp(2.8rem, 16vw, 4.8rem);
+  margin: 0.2rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(3.2rem, 19vw, 5.4rem);
   font-weight: 900;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.02em;
   line-height: 0.95;
-  background: linear-gradient(175deg, #ffffff 10%, #cfe7dc 55%, #7fb9a2 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  text-shadow: none;
+  color: #fff;
+  /* The wordmark is a sticker, the same as SENT on the wall. */
+  -webkit-text-stroke: 3px #0e1117;
+  paint-order: stroke fill;
+  text-shadow: 0 0.32rem 0 var(--accent), 0 0.9rem 2rem rgba(0, 0, 0, 0.55);
+  transform: rotate(-3deg);
 }
 .title__tag {
-  margin: 0.8rem auto 0;
-  max-width: 21rem;
-  font-size: 0.93rem;
+  margin: 1rem auto 0;
+  max-width: 19rem;
+  font-size: var(--fs-md);
   line-height: 1.5;
   color: var(--ink-dim);
 }
@@ -121,14 +131,14 @@
   padding: 0.6rem 0.4rem;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-raised);
 }
 .title__stat b { display: block; font-size: 1.15rem; font-weight: 800; }
-.title__stat b i { font-style: normal; font-size: 0.72rem; color: var(--ink-faint); }
+.title__stat b i { font-style: normal; font-size: var(--fs-xs); color: var(--ink-faint); }
 .title__stat span {
   display: block;
   margin-top: 0.1rem;
-  font-size: 0.62rem;
+  font-size: 0.6875rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-faint);
@@ -145,15 +155,15 @@
   padding: 0.7rem 0.4rem 0.6rem;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-raised);
   color: var(--good);
 }
 .title__step svg { width: 2rem; height: 2rem; }
-.title__step b { display: block; margin-top: 0.2rem; font-size: 0.82rem; color: var(--ink); }
+.title__step b { display: block; margin-top: 0.2rem; font-size: var(--fs-sm); color: var(--ink); }
 .title__step span {
   display: block;
   margin-top: 0.1rem;
-  font-size: 0.66rem;
+  font-size: var(--fs-xs);
   line-height: 1.3;
   color: var(--ink-faint);
 }
@@ -162,9 +172,9 @@
 .title__link { min-height: 2.4rem; padding: 0.5rem 1rem; font-size: 0.82rem; }
 
 .title__foot {
-  margin: 1.6rem auto 0;
+  margin: 1.4rem auto 0;
   max-width: 22rem;
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
   line-height: 1.5;
   color: var(--ink-faint);
 }
