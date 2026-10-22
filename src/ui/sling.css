@@ -36,7 +36,6 @@
   border-style: solid;
   border-color: var(--lab);
   background:
-    radial-gradient(circle, rgba(63, 212, 232, 0.16) 1.2px, transparent 1.8px) 0 0 / 1.1rem 1.1rem,
     linear-gradient(140deg, color-mix(in srgb, var(--lab) 20%, var(--bg-raised)), var(--bg-raised));
   box-shadow: 0 0 1.6rem -0.6rem color-mix(in srgb, var(--lab) 80%, transparent);
 }

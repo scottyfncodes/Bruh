@@ -14,7 +14,7 @@ import './hold-inspector.css';
 // Feet will stand on anything. Hands are the fussy ones: a foot chip has
 // nothing on it to hold, so it is the only shape that turns a hand away.
 const USES: Record<string, string> = {
-  hand: 'Hands — feet can stand on it too',
+  hand: 'Hands (feet can stand on it too)',
   foot: 'Feet only',
   both: 'Hands or feet',
 };
@@ -23,7 +23,7 @@ const USES: Record<string, string> = {
 function facing(dir: number): string {
   const d = ((dir * 180) / Math.PI + 360) % 360;
   if (d > 247 && d <= 292) return 'pull straight down';
-  if (d > 67 && d <= 112) return 'pull up — hips above it';
+  if (d > 67 && d <= 112) return 'pull up: hips above it';
   if (d > 157 && d <= 202) return 'pull left, across you';
   if (d <= 22 || d > 337) return 'pull right, away from you';
   if (d > 202 && d <= 247) return 'pull down and left';

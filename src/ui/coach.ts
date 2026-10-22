@@ -50,13 +50,13 @@ export function tipText(step: CoachStep, desktop: boolean): { title: string; bod
   switch (step) {
     case 'pick': return desktop
       ? { title: 'Make your first move', body: 'Click a hand or foot (or press Q W A S), drag away from where you want it to go, and release.' }
-      : { title: 'Make your first move', body: 'Press a hand or foot and drag it back, away from where you want it to go — like a slingshot. Let go to throw.' };
+      : { title: 'Make your first move', body: 'Press a hand or foot and drag it back, away from where you want it to go, like a slingshot. Let go to throw.' };
     case 'aim': return {
       title: 'Aiming',
       body: `The ring marks the hold it is going for. Pull further to reach further.${desktop ? ' Esc puts it down.' : ''}`,
     };
     case 'stuck': return { title: 'Stuck it', body: 'Big holds forgive a messy arrival. Small ones want your feet on and the body settled first.' };
-    case 'fail': return { title: 'It came off', body: 'The banner says why. Every miss and slip names its cause — that is the lesson for the next go.' };
+    case 'fail': return { title: 'It came off', body: 'The banner says why. Every miss and slip names its cause. That is the lesson for the next go.' };
     case 'pump': return desktop
       ? { title: 'Getting pumped', body: 'Stand on your feet to recover. Pick a hand and press X to shake it out while your feet hold you.' }
       : { title: 'Getting pumped', body: 'Stand on your feet to recover. Tap a held hand twice to shake it out while your feet hold you.' };

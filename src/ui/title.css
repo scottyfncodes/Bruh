@@ -144,29 +144,32 @@
   color: var(--ink-faint);
 }
 
+/* The whole manual, as three numbered lines: one gesture, in order. */
 .title__steps {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-  margin: 1.1rem auto 0;
-  width: min(22rem, 100%);
+  list-style: none;
+  counter-reset: step;
+  margin: 1.2rem auto 0;
+  padding: 0;
+  width: fit-content;
+  max-width: 100%;
+  text-align: left;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--ink-dim);
 }
-.title__step {
-  padding: 0.7rem 0.4rem 0.6rem;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--bg-raised);
+.title__steps li { counter-increment: step; position: relative; padding-left: 1.85rem; }
+.title__steps li + li { margin-top: 0.3rem; }
+.title__steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  width: 1.25rem;
+  font-family: var(--font-display);
+  font-weight: 900;
   color: var(--good);
+  text-align: right;
 }
-.title__step svg { width: 2rem; height: 2rem; }
-.title__step b { display: block; margin-top: 0.2rem; font-size: var(--fs-sm); color: var(--ink); }
-.title__step span {
-  display: block;
-  margin-top: 0.1rem;
-  font-size: var(--fs-xs);
-  line-height: 1.3;
-  color: var(--ink-faint);
-}
+.title__steps b { color: var(--ink); }
 
 .title__row { margin-top: 0.8rem; min-height: 0.5rem; }
 .title__link { min-height: 2.4rem; padding: 0.5rem 1rem; font-size: 0.82rem; }

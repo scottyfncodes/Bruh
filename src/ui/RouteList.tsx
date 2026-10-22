@@ -82,7 +82,7 @@ export function RouteList({
       </div>
       <div className="daily__meta">
         {daily.sent
-          ? `Sent — ${daily.bestMoves} moves, ${Math.round((daily.bestEfficiency ?? 0) * 100)}% efficiency${outOfDaily ? '. Back tomorrow.' : ''}`
+          ? `Sent: ${daily.bestMoves} moves, ${Math.round((daily.bestEfficiency ?? 0) * 100)}% efficiency${outOfDaily ? '. Back tomorrow.' : ''}`
           : !outOfDaily
             ? `Same route for everyone today. Three tries${dailyOnsight ? ' · onsight live' : ''}.`
             : 'Out of attempts. A new one tomorrow.'}
@@ -97,7 +97,7 @@ export function RouteList({
         <div>
           <div className="label">Your grade</div>
           <div className="board__grade">
-            {profile.topGrade ?? '—'}
+            {profile.topGrade ?? '–'}
             <span className="board__gradenote">
               {profile.topGrade ? 'highest send' : 'nothing sent yet'}
             </span>
@@ -181,7 +181,7 @@ export function RouteList({
           })}
           {lockedAbove > 0 && (
             <p className="board__locked">
-              {lockedAbove} more grade{lockedAbove === 1 ? '' : 's'} above, up to V17 — each opens when you send the one below.
+              {lockedAbove} more grade{lockedAbove === 1 ? '' : 's'} above, up to V17. Each opens when you send the one below.
             </p>
           )}
         </>
@@ -226,7 +226,7 @@ function RouteCard({
           {rec.sent && !rec.onsighted && <span className="card__badge">SENT</span>}
           {fresh && <span className="card__badge card__badge--fresh">ONSIGHT LIVE</span>}
         </div>
-        <div className="card__setter">{setter.name} — “{setter.line}”</div>
+        <div className="card__setter">{setter.name}: “{setter.line}”</div>
         {assessment && (
           <div className="card__assess">
             <span className={assessment.grade === route.grade ? '' : 'is-diff'}>assessed {assessment.grade}</span>

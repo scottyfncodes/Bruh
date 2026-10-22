@@ -62,7 +62,7 @@ export function RouteSetter({
                 <span className="chip" style={{ background: GRADE_COLOR[route.grade] }}>{route.grade}</span>
                 {route.name}
               </div>
-              <div className="setter__by">{setterOf(route.setter).name} — “{setterOf(route.setter).line}”</div>
+              <div className="setter__by">{setterOf(route.setter).name}: “{setterOf(route.setter).line}”</div>
               <div className="setter__tagline">{route.tagline}</div>
               {route.blueprint && route.blueprint.sections.length > 0 && (
                 <div className="setter__parts">
@@ -100,7 +100,7 @@ export function RouteSetter({
         </button>
       </div>
       <div className="setter__note">
-        Freshly set and test-climbed for you. Scored, never graded — only board routes move your grade.
+        Freshly set and test-climbed for you. Scored, never graded: only board routes move your grade.
       </div>
     </section>
   );
