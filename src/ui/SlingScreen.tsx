@@ -1730,7 +1730,7 @@ export function SlingScreen({
     }
     if (selected) return `Pull ${LIMB_LABEL[selected].toLowerCase()} back and let go.`;
     if (heldCount(sim) === 0) return 'Airborne. Fling something at the wall.';
-    if (isFull(juiceRef.current)) return 'Dyno ready. Grab the belly, pull, and stick it — fingertips will not hold.';
+    if (isFull(juiceRef.current)) return 'Dyno ready. Grab the belly, pull, and stick it. Fingertips will not hold.';
     return 'Press a limb, pull it back, let go. Clean sticks charge the dyno.';
   })();
 
@@ -1899,10 +1899,10 @@ export function SlingScreen({
               : highball
                 ? <><b>Top out {highball.highball.height.toFixed(1)} m up.</b> Same climbing, more air under it. Read the whole line first.</>
                 : lab
-                  ? <><b>The practice wall.</b> Try anything — nothing here is graded, scored or counted.</>
+                  ? <><b>The practice wall.</b> Try anything. Nothing here is graded, scored or counted.</>
                   : <><b>Top out:</b> get both hands on the <span className="inspect__white">white</span> hold.</>}
           </div>
-          {!tread && !lab && <div className="inspect__setter">{setter.name} — “{setter.line}”</div>}
+          {!tread && !lab && <div className="inspect__setter">{setter.name}: “{setter.line}”</div>}
           <ul className="inspect__how">
             {desktop ? (
               <>
@@ -1911,7 +1911,7 @@ export function SlingScreen({
               </>
             ) : (
               <>
-                <li>Press a hand or foot, drag it back, let go — it flies the other way.</li>
+                <li>Press a hand or foot, drag it back, let go. It flies the other way.</li>
                 <li>Tap any hold to see what it wants. Pinch to zoom.</li>
               </>
             )}
@@ -1921,10 +1921,10 @@ export function SlingScreen({
               <summary>How climbing works</summary>
               <p>
                 A limb can also be grabbed at its shoulder, its hip, or the hold it is on. Grab the belly and
-                pull to dyno the whole body — once you have earned it: every clean stick fills the dyno meter,
+                pull to dyno the whole body, once you have earned it. Every clean stick fills the dyno meter,
                 every whiff drains it, and a dyno spends the lot. Tap a dangling limb, then a hold, to put it
                 back on. The pump fills from the moment you pull on: hanging on your arms fills it, and weight
-                on your feet lets it drain. Tap a picked-up hand again to take it off and shake it out — if your
+                on your feet lets it drain. Tap a picked-up hand again to take it off and shake it out, if your
                 feet can hold you. Holds are not all equal: jugs take a swinging body, crimps want your feet on,
                 slopers want your weight under them. A foot thrown at blank wall smears below your hips and
                 flags out to the side.

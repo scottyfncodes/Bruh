@@ -7,7 +7,7 @@ import './title.css';
  * The front door.
  *
  * A lit patch of climbing wall with Bernie on it, the wordmark stuck on like
- * a sticker, one button. The three-step strip underneath is the entire
+ * a sticker, one button. The three numbered lines underneath are the entire
  * manual, because the entire game is one gesture repeated — and the board
  * the button opens puts the practice wall and the first V0s right at the top.
  */
@@ -56,7 +56,7 @@ export function Title({
         {returning ? (
           <div className="title__stats" role="list">
             <div className="title__stat" role="listitem">
-              <b>{profile.topGrade ?? '—'}</b><span>top grade</span>
+              <b>{profile.topGrade ?? '–'}</b><span>top grade</span>
             </div>
             <div className="title__stat" role="listitem">
               <b>{sent}<i>/{ROUTES.length}</i></b><span>routes sent</span>
@@ -66,30 +66,11 @@ export function Title({
             </div>
           </div>
         ) : (
-          <div className="title__steps" aria-label="How it plays">
-            <div className="title__step">
-              <svg viewBox="0 0 40 40" aria-hidden="true">
-                <circle cx="20" cy="20" r="9" fill="currentColor" opacity="0.18" />
-                <circle cx="20" cy="20" r="5" fill="currentColor" />
-              </svg>
-              <b>Press</b><span>a hand or a foot</span>
-            </div>
-            <div className="title__step">
-              <svg viewBox="0 0 40 40" aria-hidden="true">
-                <path d="M20 8 v14" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" />
-                <path d="M12 16 L20 8 L28 16" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                <circle cx="20" cy="30" r="5" fill="currentColor" />
-              </svg>
-              <b>Pull</b><span>it back, like a slingshot</span>
-            </div>
-            <div className="title__step">
-              <svg viewBox="0 0 40 40" aria-hidden="true">
-                <path d="M8 30 Q20 4 32 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" strokeDasharray="2 5" />
-                <circle cx="32" cy="12" r="5" fill="currentColor" />
-              </svg>
-              <b>Let go</b><span>and see what the body does</span>
-            </div>
-          </div>
+          <ol className="title__steps" aria-label="How it plays">
+            <li><b>Press</b> a hand or a foot.</li>
+            <li><b>Pull</b> it back, like a slingshot.</li>
+            <li><b>Let go</b> and see what the body does.</li>
+          </ol>
         )}
 
         <div className="title__row">
@@ -99,7 +80,7 @@ export function Title({
         </div>
 
         <p className="title__foot">
-          No timers. Just pump, physics, and a man in sunglasses who is not especially invested.
+          Pump, physics, and a man in sunglasses who is not especially invested.
         </p>
       </div>
     </div>

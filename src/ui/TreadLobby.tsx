@@ -24,13 +24,13 @@ export function TreadLobby({
       <header className="modeboard__head">
         <div>
           <div className="label">Tread Wall</div>
-          <div className="modeboard__title" style={{ color: '#9b8cff' }}>{best ? formatTime(best.time) : '—'}</div>
+          <div className="modeboard__title" style={{ color: '#9b8cff' }}>{best ? formatTime(best.time) : '–'}</div>
         </div>
         <div className="label" style={{ textAlign: 'right' }}>{best ? 'personal best' : 'no runs yet'}</div>
       </header>
       <ModeTabs mode="tread" onMode={onMode} />
       <p className="modeboard__lede">
-        A wall on a belt. It rolls down as you climb, so it never ends — the score is how long you
+        A wall on a belt. It rolls down as you climb, so it never ends. The score is how long you
         stay on. The belt never stops, not even while you aim.
       </p>
 
