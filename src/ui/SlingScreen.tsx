@@ -12,7 +12,7 @@ import {
 import { type Fatigue, breathWord, conditionOf, spendCatch, spendDyno as spendDynoBody, spendThrow, tickFatigue } from '../game/fatigue';
 import { TECHNIQUE_LABEL } from '../game/technique';
 import {
-  type TreadEnd, type TreadRun, type TreadSession, PANEL, PANEL_HALF_WIDTH, SECTION_LABEL, TREAD_END_WORDS, advanceTread, formatTime, levelGrade, sectionAt,
+  type TreadEnd, type TreadRun, type TreadSession, HOLD_X, PANEL, SECTION_LABEL, TREAD_END_WORDS, advanceTread, formatTime, levelGrade, sectionAt,
 } from '../game/tread';
 import { type Highball, isHighball, judgeLanding } from '../content/highball';
 import { AimSearch } from '../game/aimSearch';
@@ -124,6 +124,11 @@ const NOTCHES = 8;
 const CELEBRATE_MS = 1900;
 /** How long the climber lies on the mat before the screen admits it. */
 const MAT_MS = 900;
+
+const HUD_KEY = 'bruh.hud.small';
+function loadHudSmall(): boolean {
+  try { return localStorage.getItem(HUD_KEY) === '1'; } catch { return false; }
+}
 /** Longest frame the sim will try to catch up on, ms. Tab switches happen. */
 const MAX_FRAME_MS = 50;
 /** A press that travels less than this is a tap. */
@@ -208,6 +213,14 @@ export function SlingScreen({
   const [sentBanner, setSentBanner] = useState(false);
   const [landed, setLanded] = useState(false);
   const [muted, setMutedState] = useState(isMuted);
+  /** The meter card folded down to the two bars, so more of the wall shows. Remembered. */
+  const [hudSmall, setHudSmall] = useState(loadHudSmall);
+  const toggleHud = useCallback(() => {
+    setHudSmall((v) => {
+      try { localStorage.setItem(HUD_KEY, v ? '0' : '1'); } catch { /* play on */ }
+      return !v;
+    });
+  }, []);
   /** The restart button's second tap: armed for a moment after the first. */
   const [confirmRestart, setConfirmRestart] = useState(false);
   const confirmTimer = useRef(0);
@@ -319,6 +332,8 @@ export function SlingScreen({
   const timeScaleRef = useRef(1);
   /** Extra camera frame on top of the player's zoom: a punch out on launch, in on the catch. */
   const framePunchRef = useRef(0);
+  /** Where the tread wall's camera is looking up the belt: it rides with the climber. */
+  const treadFocusRef = useRef<number | null>(null);
   /** 0..1: how far the camera has pulled back for a dyno. */
   const dynoZoomRef = useRef(0);
   /** 0..1, how far the camera has moved to show a picked-up limb's whole reach. */
@@ -1087,17 +1102,22 @@ export function SlingScreen({
       const ins = insetsRef.current;
       const visible = clamp((ins.h - ins.top - ins.bottom) / ins.h, 0.5, 1);
       if (tread) {
-        // The treadwall is framed whole and held still: the belt, its frame,
-        // the hood and the skirt are what make it a treadwall, and the climber
-        // stays put on it anyway — the wall is what moves. Tall enough for
-        // all of it in the visible band, wide enough for the panel's width on
-        // a phone held upright.
+        // The treadwall: as close as the belt's holds allow side to side, so
+        // the climber reads at the size a boulder shows them. The camera rides
+        // up and down with the chest, never past the hood or below the skirt,
+        // and a reach that needs more room still gets it.
         const aspect = scene.camera.aspect || 0.5;
         const lo = -0.32;
         const hi = PANEL + 0.46;
-        const frame = clamp(Math.max((hi - lo) / visible, (PANEL_HALF_WIDTH * 2 + 0.45) / aspect), FRAME_MIN, FRAME_MAX);
+        const base = clamp(Math.max(4.4, (HOLD_X * 2 + 0.3) / aspect), FRAME_MIN, (hi - lo) / visible);
+        const frame = fit > 0 ? Math.max(base, view.frame) : base;
+        const half = (frame * visible) / 2;
+        const want = clamp(pose.com.y + 0.35, tread.ground + lo + half, Math.max(tread.ground + lo + half, tread.ground + hi - half));
+        const prev = treadFocusRef.current;
+        const at = prev === null ? want : prev + (want - prev) * 0.05;
+        treadFocusRef.current = at;
         const shift = ((ins.top - ins.bottom) / 2) * (frame / ins.h);
-        view = { ...view, frame: frame + framePunchRef.current, focusX: 0, focusY: tread.ground + (lo + hi) / 2 + shift };
+        view = { ...view, frame: frame + framePunchRef.current, focusX: 0, focusY: at + shift };
       } else {
         const f = clamp(view.frame, FRAME_MIN, FRAME_MAX);
         view = { ...view, focusY: view.focusY + ((ins.top - ins.bottom) / 2) * (f / ins.h) };
@@ -1555,7 +1575,7 @@ export function SlingScreen({
     window.addEventListener('resize', measure);
     const id = window.setTimeout(measure, 60);
     return () => { window.removeEventListener('resize', measure); window.clearTimeout(id); };
-  }, [phase, coach]);
+  }, [phase, coach, hudSmall]);
 
   // --- derived UI --------------------------------------------------------
 
@@ -1807,9 +1827,22 @@ export function SlingScreen({
       </header>
 
       {phase === 'climbing' && (
-        <div className="stamina" ref={staminaRef} data-trend="steady">
+        <div
+          className={`stamina${hudSmall ? ' stamina--small' : ''}`}
+          ref={staminaRef}
+          data-trend="steady"
+          role="button"
+          tabIndex={0}
+          aria-expanded={!hudSmall}
+          aria-label={hudSmall ? 'Show the full meters' : 'Fold the meters down'}
+          onClick={toggleHud}
+          onKeyDown={(e) => { if (e.key === 'Enter') toggleHud(); }}
+        >
           <div className="stamina__row">
-            <span className="stamina__label">Pump</span>
+            <span className="stamina__label">
+              Pump
+              <svg className="stamina__fold" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 6.5 5 3.5 8 6.5" /></svg>
+            </span>
             <span className="stamina__word" ref={pumpRef}>fresh</span>
           </div>
           <div className="stamina__track">

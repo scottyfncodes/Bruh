@@ -80,8 +80,31 @@
   border: 1px solid var(--line);
   background: var(--glass);
   box-shadow: var(--shadow);
-  pointer-events: none;
+  cursor: pointer;
 }
+/* Folded: just the pump and the dyno. A tap brings the rest back. */
+.stamina--small {
+  width: min(7.5rem, 34vw);
+  padding: 0.35rem 0.5rem 0.4rem;
+}
+.stamina--small .stamina__why,
+.stamina--small .body,
+.stamina--small .tech { display: none; }
+.stamina--small .juice { margin-top: 0.3rem; }
+.stamina--small .stamina__word { font-size: 0.625rem; }
+.stamina__fold {
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-left: 0.2rem;
+  vertical-align: -0.05rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s;
+}
+.stamina--small .stamina__fold { transform: rotate(180deg); }
 .stamina__row {
   display: flex;
   justify-content: space-between;

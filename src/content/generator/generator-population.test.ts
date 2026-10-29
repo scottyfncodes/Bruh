@@ -1,0 +1,157 @@
+import { describe, expect, it } from 'vitest';
+import { DIFFICULTIES, buildRoute, shapeOf, type Difficulty } from './index';
+import { checkShape, checkStructure } from './validate';
+import { TIERS } from './difficulty';
+import type { BuildResult } from './build';
+
+/**
+ * The fast kind of route setter test: hundreds of candidate routes per
+ * difficulty, not climbed, checked as a population.
+ */
+
+/** Candidates that pass the cheap checks, i.e. the ones the setter would go on to climb. */
+function population(d: Difficulty, n = 160): BuildResult[] {
+  const out: BuildResult[] = [];
+  for (let seed = 1; out.length < n && seed < n * 10; seed++) {
+    const b = buildRoute(d, seed * 7919);
+    if (!checkStructure(b) && !checkShape(b, d)) out.push(b);
+  }
+  return out;
+}
+
+const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / Math.max(1, xs.length);
+const share = <T>(xs: T[], f: (x: T) => boolean) => xs.filter(f).length / Math.max(1, xs.length);
+
+const POP = Object.fromEntries(DIFFICULTIES.map((d) => [d, population(d)])) as Record<Difficulty, BuildResult[]>;
+
+describe('difficulty changes the shape, not just the pitch', () => {
+  it('every difficulty produces plenty of candidates worth climbing', () => {
+    for (const d of DIFFICULTIES) expect(POP[d].length).toBe(160);
+  });
+
+  it('harder routes go further sideways, wider, with more changes of direction', () => {
+    const lat = DIFFICULTIES.map((d) => mean(POP[d].map((b) => shapeOf(b.path).lateralTravel)));
+    const ext = DIFFICULTIES.map((d) => mean(POP[d].map((b) => shapeOf(b.path).lateralExtent)));
+    const turns = DIFFICULTIES.map((d) => mean(POP[d].map((b) => shapeOf(b.path).directionChanges)));
+    for (let i = 1; i < DIFFICULTIES.length; i++) {
+      expect(lat[i]).toBeGreaterThan(lat[i - 1]);
+      expect(turns[i]).toBeGreaterThan(turns[i - 1]);
+    }
+    // Width saturates on a 3.4 m wall, so only the big steps are strict.
+    expect(ext[1]).toBeGreaterThan(ext[0]);
+    expect(ext[2]).toBeGreaterThan(ext[1]);
+    expect(ext[4]).toBeGreaterThan(ext[2]);
+  });
+
+  it('easy is readable: mostly up, never a perfectly straight ladder', () => {
+    for (const b of POP.easy) {
+      const m = shapeOf(b.path);
+      expect(m.lateralTravel).toBeGreaterThanOrEqual(0.2);
+      expect(m.lateralExtent).toBeLessThanOrEqual(0.95);
+      expect(m.downSteps).toBe(0);
+      expect(b.plan.sections.some((a) => a === 'traverse' || a === 'roof' || a === 'overhang')).toBe(false);
+      expect(b.plan.cruxes).toHaveLength(0);
+    }
+  });
+
+  it('traverses start at moderate and are a fixture from very hard up', () => {
+    const has = (d: Difficulty) => share(POP[d], (b) => b.plan.sections.includes('traverse'));
+    expect(has('easy')).toBe(0);
+    expect(has('moderate')).toBeGreaterThan(0.15);
+    expect(has('hard')).toBeGreaterThan(0.4);
+    expect(has('veryHard')).toBe(1);
+    expect(has('brutal')).toBe(1);
+    expect(has('elite')).toBe(1);
+    expect(has('mythic')).toBe(1);
+  });
+
+  it('roofs and steep sections only appear from hard up, and always from very hard', () => {
+    const steep = (d: Difficulty) => share(POP[d], (b) => b.plan.sections.some((a) => a === 'roof' || a === 'overhang'));
+    expect(steep('easy')).toBe(0);
+    expect(steep('moderate')).toBe(0);
+    expect(steep('hard')).toBeGreaterThan(0.2);
+    expect(steep('veryHard')).toBe(1);
+    expect(steep('brutal')).toBe(1);
+    expect(steep('elite')).toBe(1);
+    expect(steep('mythic')).toBe(1);
+  });
+
+  it('harder routes are longer, and go further up the wall', () => {
+    const moves = DIFFICULTIES.map((d) => mean(POP[d].map((b) => b.spine.length)));
+    const tops = DIFFICULTIES.map((d) => mean(POP[d].map((b) => Math.max(...b.route.holds.map((h) => h.pos.y)))));
+    for (let i = 1; i < DIFFICULTIES.length; i++) {
+      expect(moves[i]).toBeGreaterThan(moves[i - 1]);
+      expect(tops[i]).toBeGreaterThan(tops[i - 1]);
+    }
+    // The top tier goes well past seven metres; easy stays around four.
+    expect(tops[DIFFICULTIES.indexOf('mythic')]).toBeGreaterThan(6.8);
+    expect(tops[0]).toBeLessThan(4.2);
+  });
+
+  it('harder tiers combine more ideas', () => {
+    const kinds = (d: Difficulty) => mean(POP[d].map((b) => new Set(b.plan.sections).size));
+    expect(kinds('easy')).toBeLessThan(2);
+    expect(kinds('hard')).toBeGreaterThan(kinds('moderate'));
+    expect(kinds('brutal')).toBeGreaterThan(kinds('veryHard'));
+    expect(kinds('brutal')).toBeGreaterThanOrEqual(3.5);
+    expect(kinds('mythic')).toBeGreaterThan(kinds('brutal'));
+  });
+
+  it('has cruxes where it should, and puts the last one late', () => {
+    expect(share(POP.easy, (b) => b.plan.cruxes.length > 0)).toBe(0);
+    expect(share(POP.hard, (b) => b.plan.cruxes.length >= 1)).toBe(1);
+    expect(share(POP.brutal, (b) => b.plan.cruxes.length >= 2)).toBe(1);
+    expect(share(POP.mythic, (b) => b.plan.cruxes.length >= 3)).toBe(1);
+    for (const d of ['hard', 'veryHard', 'brutal', 'elite', 'mythic'] as const) {
+      const at = POP[d].map((b) => shapeOf(b.path).cruxAt!).filter((x) => x !== null);
+      expect(mean(at)).toBeGreaterThan(0.6);
+    }
+  });
+
+  it('never runs sideways for longer than the tier allows', () => {
+    for (const d of DIFFICULTIES) {
+      for (const b of POP[d]) {
+        expect(shapeOf(b.path).maxConsecutiveLateral).toBeLessThanOrEqual(TIERS[d].maxConsecutiveLateral + 1);
+      }
+    }
+  });
+
+  it('pitch is the smallest lever: a brutal route is not just a steeper easy one', () => {
+    const pitch = (d: Difficulty) => mean(POP[d].map((b) => b.route.overhang ?? 0));
+    // Hand-set V8-V10s sit at 30-34 degrees; generated brutal routes stay below that.
+    expect(pitch('brutal')).toBeLessThan(30);
+    const lat = (d: Difficulty) => mean(POP[d].map((b) => shapeOf(b.path).lateralTravel));
+    expect(lat('brutal') / Math.max(0.01, lat('easy'))).toBeGreaterThan(5);
+  });
+});
+
+describe('variety', () => {
+  it('two routes in a row at the same difficulty are different routes', () => {
+    for (const d of DIFFICULTIES) {
+      for (let i = 1; i < 40; i++) {
+        const a = POP[d][i - 1].route;
+        const b = POP[d][i].route;
+        expect(a.holds).not.toEqual(b.holds);
+      }
+    }
+  });
+
+  it('section order, start side and crux kinds all vary at the top end', () => {
+    for (const d of ['hard', 'veryHard', 'brutal'] as const) {
+      const orders = new Set(POP[d].map((b) => b.plan.sections.join('>')));
+      const starts = new Set(POP[d].map((b) => Math.sign(b.route.holds[0].pos.x)));
+      const cruxes = new Set(POP[d].flatMap((b) => b.plan.cruxes));
+      expect(orders.size).toBeGreaterThan(15);
+      expect(starts.size).toBe(2);
+      expect(cruxes.size).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it('every archetype gets used somewhere', () => {
+    const used = new Set(DIFFICULTIES.flatMap((d) => POP[d].flatMap((b) => b.plan.sections)));
+    for (const a of ['slab', 'zigzag', 'traverse', 'roof', 'overhang', 'dihedral', 'crack', 'arete', 'compression']) {
+      expect(used.has(a as never)).toBe(true);
+    }
+  });
+});
+
