@@ -79,7 +79,7 @@ export function RouteSetter({
               <div className="setter__meta">
                 par {route.par}
                 {route.overhang ? ` · ${route.overhang}° wall` : ''}
-                {rec && rec.sent ? ` · sent in ${rec.best?.moves ?? '?'}` : rec && rec.attempts > 0 ? ` · ${rec.attempts} attempts` : ''}
+                {rec && rec.sent ? ` · sent in ${rec.best?.moves ?? '?'}` : rec && rec.attempts > 0 ? ` · ${rec.attempts} attempt${rec.attempts === 1 ? '' : 's'}` : ''}
               </div>
             </div>
           </>

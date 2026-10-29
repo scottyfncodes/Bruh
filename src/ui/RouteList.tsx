@@ -82,7 +82,7 @@ export function RouteList({
       </div>
       <div className="daily__meta">
         {daily.sent
-          ? `Sent: ${daily.bestMoves} moves, ${Math.round((daily.bestEfficiency ?? 0) * 100)}% efficiency${outOfDaily ? '. Back tomorrow.' : ''}`
+          ? `Sent: ${daily.bestMoves} move${daily.bestMoves === 1 ? '' : 's'}, ${Math.round((daily.bestEfficiency ?? 0) * 100)}% efficiency${outOfDaily ? '. Back tomorrow.' : ''}`
           : !outOfDaily
             ? `Same route for everyone today. Three tries${dailyOnsight ? ' · onsight live' : ''}.`
             : 'Out of attempts. A new one tomorrow.'}
@@ -237,7 +237,7 @@ function RouteCard({
           {rec.attempts === 0
             ? `par ${route.par}`
             : rec.sent
-              ? `${rec.best?.moves ?? '?'} moves · ${Math.round((rec.best?.efficiency ?? 0) * 100)}% · ${rec.attempts} attempt${rec.attempts === 1 ? '' : 's'}`
+              ? `${rec.best?.moves ?? '?'} move${rec.best?.moves === 1 ? '' : 's'} · ${Math.round((rec.best?.efficiency ?? 0) * 100)}% · ${rec.attempts} attempt${rec.attempts === 1 ? '' : 's'}`
               : `${projectStatus(rec, route.par)} · ${rec.attempts} attempt${rec.attempts === 1 ? '' : 's'} · best move ${rec.bestMove}`}
         </div>
       </button>

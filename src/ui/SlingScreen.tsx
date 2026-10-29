@@ -236,7 +236,7 @@ export function SlingScreen({
   const treadPbRef = useRef<HTMLDivElement>(null);
   const treadStats = useRef({ rested: 0, maxPump: 0, slips: 0, moves: 0, ended: false });
   /** A highball fall, judged: what the landing was, and when the next go is allowed. */
-  const [landing, setLandingState] = useState<{ kind: 'clean' | 'heavy' | 'off-pads'; words: string; until: number } | null>(null);
+  const [landing, setLandingState] = useState<{ kind: 'clean' | 'heavy' | 'off-pads'; words: string; pause: number } | null>(null);
   const phaseRef = useRef<Phase>('inspect');
   const selectedRef = useRef<Selection | null>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -707,7 +707,7 @@ export function SlingScreen({
           if (highball) {
             const judged = judgeLanding(highball.highball.landing, e.from, e.at.x);
             const pause = judged.kind === 'clean' ? 0 : judged.kind === 'heavy' ? 6000 : 8000;
-            setLandingState({ ...judged, until: Date.now() + pause });
+            setLandingState({ ...judged, pause });
             onLanding?.(judged.kind);
           }
           setSelected(null);
@@ -1771,7 +1771,7 @@ export function SlingScreen({
               <span className={`climb__mode climb__mode--${highball ? 'highball' : lab ? 'lab' : modeRef.current}`}>
                 {lab ? 'Practice' : highball ? 'Highball' : modeRef.current === 'onsight' ? 'Onsight' : 'Project'}
               </span>
-              <span><b>{launches}</b> moves</span>
+              <span><b>{launches}</b> move{launches === 1 ? '' : 's'}</span>
               <span className="climb__caught"><b>{catches}</b> caught</span>
               {!lab && <span className="climb__par">par {route.par}</span>}
               {attemptsNote && <span className="climb__note">{attemptsNote}</span>}
@@ -1866,7 +1866,7 @@ export function SlingScreen({
         <div className="sent">
           {modeRef.current === 'onsight' && !lab && <div className="sent__kicker">onsight</div>}
           <div className="sent__word">SENT</div>
-          <div className="sent__sub">{launches} moves{lab ? '' : ` · par ${route.par}`}</div>
+          <div className="sent__sub">{launches} move{launches === 1 ? '' : 's'}{lab ? '' : ` · par ${route.par}`}</div>
         </div>
       )}
 
@@ -1973,7 +1973,7 @@ export function SlingScreen({
           {retriesLeft === 0 && <div className="falloff__landing">That was the last of today's three attempts. The daily is back tomorrow.</div>}
           <div className="falloff__row">
             <button className={`btn${retriesLeft === 0 ? ' btn--primary' : ''}`} onClick={onExit}>{retriesLeft === 0 ? 'Back to the board' : 'Leave it'}</button>
-            {retriesLeft !== 0 && <BreathButton until={landing?.until ?? 0} onGo={() => restart()} />}
+            {retriesLeft !== 0 && <BreathButton pause={landing?.pause ?? 0} onGo={() => restart()} />}
           </div>
         </div>
       )}
@@ -2038,8 +2038,11 @@ function contactsView(sim: SlingState): Partial<Record<LimbId, { state: string; 
 /**
  * Try again, after a breath if the landing called for one. Counts down
  * rather than hiding: the wait is part of the highball, not a punishment.
+ * The breath starts when the button shows, so all of it is on screen however
+ * long the fall took to play out.
  */
-function BreathButton({ until, onGo }: { until: number; onGo: () => void }) {
+function BreathButton({ pause, onGo }: { pause: number; onGo: () => void }) {
+  const [until] = useState(() => Date.now() + pause);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (until <= Date.now()) return;
