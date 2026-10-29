@@ -715,16 +715,26 @@ src/state/progress.test.ts the daily's three attempts, grades only on open
                            rungs, points that never go down, setter points
                            banked per difficulty, saves repaired on load
 src/content/routes.test.ts every route: valid data, inside the wall, a start
-                           that stands up, a finish near the top, actually
-                           climbable, and a par a clean climb could hit
-src/content/generator/generator.test.ts
-                           generated routes at every difficulty, end to end:
-                           the same checks as the hand-set routes, an
-                           independent send, rebuilt identically from the id,
-                           deterministic per seed; and over hundreds of
-                           candidates per tier, that harder tiers go further
-                           sideways with more direction changes, combine more
-                           archetypes, get traverses, roofs and cruxes at the
-                           right tiers with the last crux late, vary from one
-                           route to the next, and never move your grade
+                           that stands up, a finish near the top
+src/content/routes-climb-{a,b}.test.ts
+                           every route actually climbable, and a par a clean
+                           climb could hit (half the board each)
+src/content/routes-board.test.ts
+                           the long board routes are still the routes their
+                           setter climbed
+src/content/generator/generator{,-e2e}.test.ts
+                           generated routes at every difficulty, end to end
+                           (half the tiers each): the same checks as the
+                           hand-set routes, an independent send, rebuilt
+                           identically from the id, deterministic per seed,
+                           and never moving your grade
+src/content/generator/generator-population.test.ts
+                           over hundreds of candidates per tier, that harder
+                           tiers go further sideways with more direction
+                           changes, combine more archetypes, get traverses,
+                           roofs and cruxes at the right tiers with the last
+                           crux late, and vary from one route to the next
 ```
+
+The slow checks are split across files so they run in parallel, and CI
+spreads the files over three runners (`vitest run --shard`).
