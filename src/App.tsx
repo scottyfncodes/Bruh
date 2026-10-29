@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ComponentProps, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Grade, Route } from './game/types';
 import { GRADES } from './game/types';
 import { ROUTES, routeById } from './content/routes';
@@ -10,7 +10,6 @@ import {
 } from './state/progress';
 import { attemptsRemaining, canAttemptDaily, recordDailyAttempt, refreshDaily } from './game/daily';
 import { useProfile } from './state/useProfile';
-import { SlingScreen } from './ui/SlingScreen';
 import { ResultScreen } from './ui/ResultScreen';
 import { RouteList } from './ui/RouteList';
 import { Breakthrough } from './ui/Breakthrough';
@@ -47,6 +46,19 @@ type Screen =
   | { kind: 'tread'; session: TreadSession; route: Route; n: number }
   | { kind: 'treadResult'; run: TreadRun; previous: TreadRun | null; isBest: boolean };
 
+// The climbing screen carries three.js, most of the download. It loads on its
+// own, fetched in the background while the menus are up, so the title is
+// on screen without waiting for the 3D engine.
+const loadSling = () => import('./ui/SlingScreen');
+const LazySling = lazy(() => loadSling().then((m) => ({ default: m.SlingScreen })));
+function SlingScreen(props: ComponentProps<typeof LazySling>) {
+  return (
+    <Suspense fallback={<div className="loading" aria-label="Loading the wall" />}>
+      <LazySling {...props} />
+    </Suspense>
+  );
+}
+
 const TREAD_KEY = 'bruh.tread.program';
 function loadTreadProgram(): string {
   try { return localStorage.getItem(TREAD_KEY) ?? 'classic'; } catch { return 'classic'; }
@@ -59,6 +71,11 @@ export default function App() {
   const daily = useMemo(() => refreshDaily(profile.daily), [profile.daily]);
   const [treadProgram, setTreadProgram] = useState(loadTreadProgram);
   const treadRuns = useRef(0);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => { void loadSling(); }, 300);
+    return () => window.clearTimeout(id);
+  }, []);
 
   const pickTreadProgram = useCallback((id: string) => {
     setTreadProgram(id);
