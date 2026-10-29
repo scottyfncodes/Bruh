@@ -58,7 +58,7 @@ function HighballCard({ h, profile, onClimb }: { h: Highball; profile: Profile; 
         {setterOf(h.setter).name} · {l.pads} pad{l.pads > 1 ? 's' : ''}{l.spotter ? ' + spotter' : ', no spotter'}
         {a ? ` · ${a.styles.slice(0, 3).join(', ')}` : ''}
         {' · '}
-        {rec.attempts === 0 ? 'untouched' : rec.sent ? `sent · ${rec.attempts} go${rec.attempts > 1 ? 'es' : ''}` : `${rec.attempts} go${rec.attempts > 1 ? 'es' : ''}, best ${rec.bestMove} moves`}
+        {rec.attempts === 0 ? 'untouched' : rec.sent ? `sent · ${rec.attempts} go${rec.attempts > 1 ? 'es' : ''}` : `${rec.attempts} go${rec.attempts > 1 ? 'es' : ''}, best ${rec.bestMove} move${rec.bestMove === 1 ? '' : 's'}`}
       </div>
       <div className="hbcard__bar"><i style={{ width: `${best * 100}%` }} /></div>
     </button>

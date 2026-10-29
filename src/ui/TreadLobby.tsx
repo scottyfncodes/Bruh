@@ -72,7 +72,7 @@ export function TreadLobby({
                 <td>{i + 1}</td>
                 <td className="lboard__time">{formatTime(r.time)}</td>
                 <td>{r.distance.toFixed(1)} m</td>
-                <td>{r.moves} moves</td>
+                <td>{r.moves} move{r.moves === 1 ? '' : 's'}</td>
                 <td>peak {levelGrade(r.peakLevel)}</td>
               </tr>
             ))}
