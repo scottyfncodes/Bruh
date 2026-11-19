@@ -1,0 +1,23 @@
+{
+  "features": [
+    {
+      "name": "a first-time player starts on the practice wall",
+      "requirement": "onboarding: someone new is a throw away from their first move, not a route list away",
+      "steps": [
+        {"click": ".title__go"},
+        {"expect": ".climb__title", "text": "Sling Lab"},
+        {"expect": ".inspect__go", "text": "Pull on"}
+      ]
+    },
+    {
+      "name": "the practice wall pulls on and offers the first move",
+      "requirement": "onboarding: the first tip is up once the climber is on the wall",
+      "steps": [
+        {"click": ".title__go"},
+        {"click": ".inspect__go"},
+        {"wait": 1500},
+        {"expect": ".coach", "text": "Make your first move"}
+      ]
+    }
+  ]
+}
