@@ -1,0 +1,9 @@
+{
+  "*": {
+    "license": "All rights reserved",
+    "attribution": null,
+    "owner": "the Bruh project",
+    "origin": "Original work: renders of the game's own three.js climber, made by scripts/gen-icons.mjs in this repository. No third-party content.",
+    "note": "No licence is granted for reuse. Recorded by the owner's decision, 19 November 2026."
+  }
+}

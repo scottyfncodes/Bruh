@@ -28,7 +28,7 @@ import {
 } from '../game/juice';
 import { WallScene, DEFAULT_CAMERA, FRAME_MAX, FRAME_MIN, ORBIT_LIMIT } from '../render/scene';
 import type { Mood } from '../render/climber';
-import { LIMB_TOUCH_RADIUS, SHOUT_MS, introAlpha, shoutText } from '../render/overlay';
+import { LIMB_PIP_RADIUS, LIMB_TOUCH_RADIUS, SHOUT_MS, introAlpha, shoutText } from '../render/overlay';
 import { drawSlingOverlay, type PullView, type Selection, type SnapView } from '../render/slingOverlay';
 import { GRADE_COLOR } from '../render/palette';
 import { HAND_Z, FOOT_Z, HIP_Z, HOLD_Z, TORSO_Z } from '../render/depths';
@@ -111,6 +111,16 @@ const DYNO_LOOK_UP = 1.3;
 const DYNO_FRAME = 6.0;
 /** Room left round the holds a picked-up limb can reach when the camera fits them, metres. */
 const REACH_MARGIN = 0.4;
+/**
+ * Clear space kept between a foot on a hold and the top of the hint or tip
+ * at the bottom of the screen, px: a whole pip and a thumb's edge, so the feet
+ * are always there to press. Without it, the start of every route parks both
+ * feet under the hint bar on a phone, and the first tip says "press a hand or
+ * foot" over the top of them.
+ */
+const FOOT_CLEARANCE_PX = 34;
+/** The most the camera drops to keep the feet in view, metres. */
+const FEET_LIFT_MAX = 1.1;
 const DYNO_APEX_TIME = 0.28;
 /** Milliseconds a frame may spend searching the aim assist's fan. */
 const AIM_BUDGET_MS = 6;
@@ -334,6 +344,8 @@ export function SlingScreen({
   const framePunchRef = useRef(0);
   /** Where the tread wall's camera is looking up the belt: it rides with the climber. */
   const treadFocusRef = useRef<number | null>(null);
+  /** How far the camera has dropped to keep the feet above the bottom UI, metres. */
+  const feetLiftRef = useRef(0);
   /** 0..1: how far the camera has pulled back for a dyno. */
   const dynoZoomRef = useRef(0);
   /** 0..1, how far the camera has moved to show a picked-up limb's whole reach. */
@@ -1120,9 +1132,28 @@ export function SlingScreen({
         view = { ...view, frame: frame + framePunchRef.current, focusX: 0, focusY: at + shift };
       } else {
         const f = clamp(view.frame, FRAME_MIN, FRAME_MAX);
-        view = { ...view, focusY: view.focusY + ((ins.top - ins.bottom) / 2) * (f / ins.h) };
+        view = { ...view, focusY: view.focusY + ((ins.top - ins.bottom) / 2) * (f / ins.h) - feetLiftRef.current };
       }
       scene.setCamera({ ...view, frame: clamp(view.frame, FRAME_MIN, FRAME_MAX) });
+
+      // Feet in view. Following the chest puts a climber standing at the
+      // bottom of the wall with both feet under the hint or a tip, where
+      // they cannot be pressed. Measured where the feet actually land on
+      // screen, so the camera drops just enough, eased, and only for feet
+      // standing on something: a foot in the air during a dyno is not a
+      // reason to look down. Left alone while you pan the view yourself.
+      if (!tread && phaseRef.current === 'climbing' && followRef.current && ins.bottom > 0) {
+        const line = ins.h - ins.bottom - FOOT_CLEARANCE_PX;
+        let low = -Infinity;
+        for (const id of ['LF', 'RF'] as const) {
+          if (sim.limbs[id].phase !== 'held') continue;
+          low = Math.max(low, scene.project(limbs[id], FOOT_Z).y);
+        }
+        const mpp = clamp(view.frame, FRAME_MIN, FRAME_MAX) / ins.h;
+        const need = low === -Infinity ? 0 : clamp(feetLiftRef.current + (low - line) * mpp, 0, FEET_LIFT_MAX);
+        feetLiftRef.current += (need - feetLiftRef.current) * 0.12;
+        if (feetLiftRef.current < 0.002) feetLiftRef.current = 0;
+      }
 
       // --- overlay ---
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -1683,6 +1714,24 @@ export function SlingScreen({
     window.clearTimeout(dynoReadyTimer.current);
   }, []);
 
+  // The run as numbers, read-only, for automated play testing: what phase
+  // the climb is in, the moves made and how pumped the climber is. Reading
+  // it changes nothing; the menus put it back to the title state.
+  useEffect(() => {
+    const w = window as unknown as { __game?: unknown };
+    const game = {};
+    Object.defineProperties(game, {
+      state: { enumerable: true, get: () => (phaseRef.current === 'sent' || phaseRef.current === 'fallen' ? 'over' : 'playing') },
+      phase: { enumerable: true, get: () => phaseRef.current },
+      route: { enumerable: true, value: route.id },
+      moves: { enumerable: true, get: () => movesRef.current.length },
+      pump: { enumerable: true, get: () => Math.round(pumpStateRef.current.pump * 100) / 100 },
+      height: { enumerable: true, get: () => Math.round(simRef.current.hip.y * 100) / 100 },
+    });
+    w.__game = game;
+    return () => { w.__game = { state: 'title' }; };
+  }, [route.id]);
+
   // Test hook, only with ?debug in the URL: lift the body and let go of
   // everything, so the smoke test can check a fall and its landing.
   useEffect(() => {
@@ -1703,6 +1752,18 @@ export function SlingScreen({
         sim.heldLast = 4;
       },
       state: () => ({ phase: phaseRef.current, hip: simRef.current.hip, ground: simRef.current.ground ?? 0 }),
+      /**
+       * Where the feet are on screen against the top of the bottom UI, px:
+       * a test can see that both are there to press, clear of the hint.
+       */
+      feet: () => {
+        const scene = sceneRef.current;
+        const ins = insetsRef.current;
+        const limbs = limbPositions(simRef.current);
+        const line = ins.h - ins.bottom;
+        const at = (id: 'LF' | 'RF') => (scene ? scene.project(limbs[id], FOOT_Z).y : NaN);
+        return { LF: at('LF'), RF: at('RF'), line, clear: Math.max(at('LF'), at('RF')) + LIMB_PIP_RADIUS <= line };
+      },
       /** Both hands onto the finish, so a test can see the send and the scorecard. */
       send: () => {
         const sim = simRef.current;

@@ -24,6 +24,11 @@ const step = (msg) => console.log('·', msg);
 await page.goto(URL, { waitUntil: 'networkidle' });
 await shot('01-title');
 await page.locator('.title__go').click();
+await wait(1500);
+// Someone new goes straight onto the practice wall; the board is one step back.
+if ((await page.locator('.climb__title').textContent().catch(() => '')) !== 'Sling Lab') throw new Error('a first start did not open the practice wall');
+step('first start: the practice wall');
+await page.getByRole('button', { name: 'Back to routes' }).click();
 await wait(600);
 await shot('02-board');
 step('board up');
@@ -32,7 +37,11 @@ step('board up');
 await page.getByRole('button', { name: /This Is A Warmup/ }).click();
 await wait(900);
 await page.getByRole('button', { name: /Start onsight|Pull on/ }).click();
-await wait(1200);
+await wait(2500);
+// Both feet must be on screen and clear of the hint at the bottom, so they can be pressed.
+const feet = await page.evaluate(() => window.__bruh.feet());
+step(`feet at ${Math.round(feet.LF)} / ${Math.round(feet.RF)} px, bottom UI from ${Math.round(feet.line)} px`);
+if (!feet.clear) throw new Error('a foot is under the bottom UI at the start of the route');
 const pip = async () => {
   // The right hand pip: find it by projecting through the page's scene is not exposed, so
   // press the right hand's key and pull from the middle of the screen.

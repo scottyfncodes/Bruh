@@ -15,7 +15,7 @@ import { RouteList } from './ui/RouteList';
 import { Breakthrough } from './ui/Breakthrough';
 import { Title } from './ui/Title';
 import { Standings } from './ui/Standings';
-import { isLabRoute } from './content/lab';
+import { SLING_LAB, isLabRoute } from './content/lab';
 import { fitnessFor } from './game/pump';
 import { type Difficulty, generatedRouteById } from './content/generator';
 import { nextRoute, prefetchRoute } from './content/generator/client';
@@ -57,6 +57,20 @@ function SlingScreen(props: ComponentProps<typeof LazySling>) {
       <LazySling {...props} />
     </Suspense>
   );
+}
+
+/**
+ * Whether this device has been to the practice wall. Someone new who presses
+ * Start climbing is taken straight onto it, a throw away from their first
+ * move, instead of to a list of routes they have no way to read yet. Once
+ * they have been, Start climbing goes to the board as it always has.
+ */
+const LAB_KEY = 'bruh.lab.seen';
+function labSeen(): boolean {
+  try { return localStorage.getItem(LAB_KEY) === '1'; } catch { return true; }
+}
+function markLabSeen(): void {
+  try { localStorage.setItem(LAB_KEY, '1'); } catch { /* play on */ }
 }
 
 const TREAD_KEY = 'bruh.tread.program';
@@ -163,6 +177,7 @@ export default function App() {
     const asDaily = !!opts.daily && route.id === daily.routeId && canAttemptDaily(daily);
     if (opts.daily && !asDaily) return;
     dailyRun.current = asDaily;
+    if (isLabRoute(route.id)) markLabSeen();
     const mode: AttemptMode = onsightAvailable(profile, route.id) && (!asDaily || daily.onsightAvailable) ? 'onsight' : 'project';
     setScreen({ kind: 'climb', route, mode, daily: asDaily });
   }, [profile, daily]);
@@ -232,7 +247,10 @@ export default function App() {
       return (
         <Title
           profile={profile}
-          onStart={() => setScreen({ kind: 'board' })}
+          onStart={() => {
+            if (profile.totalSends === 0 && !labSeen()) startClimb(SLING_LAB, {});
+            else setScreen({ kind: 'board' });
+          }}
           onStandings={() => setScreen({ kind: 'standings' })}
         />
       );

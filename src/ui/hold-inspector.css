@@ -13,10 +13,12 @@
 }
 .holdinfo__close {
   position: absolute;
-  top: 0.35rem;
-  right: 0.5rem;
-  width: 2rem;
-  height: 2rem;
+  /* A thumb-sized target round the same small cross: reading a hold mid-climb
+     and closing it again should not take aim. */
+  top: 0.1rem;
+  right: 0.2rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border: 0;
   background: none;
   color: rgba(255, 255, 255, 0.55);
@@ -52,8 +54,8 @@
   color: rgba(255, 255, 255, 0.4);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 0.6875rem;
-  padding-top: 0.1rem;
+  font-size: 0.75rem;
+  padding-top: 0.05rem;
 }
 .holdinfo__facts dd {
   margin: 0;
