@@ -18,7 +18,8 @@
     "fit:grades": "esbuild scripts/grade-features.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/grade-features.mjs --log-level=error && node node_modules/.cache/grade-features.mjs && python3 scripts/fit-grades.py",
     "find:highballs": "esbuild scripts/find-highballs.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/find-highballs.mjs --log-level=error && node node_modules/.cache/find-highballs.mjs",
     "gen:grades": "esbuild scripts/gen-grades.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/gen-grades.mjs --log-level=error && node node_modules/.cache/gen-grades.mjs",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "experiment:trust-feet": "esbuild scripts/trust-feet-experiment.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/trust-feet-experiment.mjs --log-level=error && node node_modules/.cache/trust-feet-experiment.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

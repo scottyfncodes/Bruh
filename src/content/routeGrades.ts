@@ -48,22 +48,28 @@ const DATA: Record<string, Assessment> = {
   },
   "trust-feet": {
     "grade": "V2",
-    "score": 1.93,
+    "score": 1.8,
     "crux": {
-      "move": 14,
-      "holdId": 22,
-      "difficulty": 0.15
+      "move": 5,
+      "holdId": 11,
+      "difficulty": 0.24
     },
-    "sustained": 0.06,
-    "rests": 14,
+    "sustained": 0.12,
+    "rests": 15,
     "solutions": 3,
-    "moves": 14,
+    "moves": 15,
     "styles": [
-      "vertical"
+      "vertical",
+      "compression",
+      "dynamic",
+      "technical"
     ],
     "techniques": [
-      "match",
-      "highStep"
+      "pinch",
+      "compression",
+      "highStep",
+      "heelHook",
+      "match"
     ]
   },
   "just-reach": {
