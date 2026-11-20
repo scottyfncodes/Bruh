@@ -221,11 +221,15 @@ const DATA: Record<string, CommunityBeta[]> = {
       "share": 0.54,
       "beta": [
         {
-          "limb": "RH",
-          "holdId": 8
+          "limb": "LH",
+          "holdId": 9
         },
         {
-          "limb": "LH",
+          "limb": "RH",
+          "holdId": 7
+        },
+        {
+          "limb": "LF",
           "holdId": 8
         },
         {
@@ -233,48 +237,48 @@ const DATA: Record<string, CommunityBeta[]> = {
           "holdId": 6
         },
         {
-          "limb": "LF",
-          "holdId": 5
-        },
-        {
-          "limb": "LH",
-          "holdId": 12
-        },
-        {
           "limb": "RH",
-          "holdId": 12
+          "holdId": 11
         },
         {
           "limb": "LF",
-          "holdId": 9
+          "holdId": 1
         },
         {
           "limb": "RF",
           "holdId": 2
         },
         {
-          "limb": "LH",
-          "holdId": 16
+          "limb": "RH",
+          "holdId": 14
         },
         {
           "limb": "RH",
-          "holdId": 16
+          "holdId": 20
         },
         {
           "limb": "RF",
-          "holdId": 8
+          "holdId": 17
+        },
+        {
+          "limb": "RF",
+          "holdId": 19
         },
         {
           "limb": "LF",
-          "holdId": 13
-        },
-        {
-          "limb": "LH",
-          "holdId": 22
+          "holdId": 16
         },
         {
           "limb": "RH",
-          "holdId": 22
+          "holdId": 15
+        },
+        {
+          "limb": "LF",
+          "holdId": 18
+        },
+        {
+          "limb": "LH",
+          "holdId": 15
         }
       ]
     },
@@ -283,24 +287,78 @@ const DATA: Record<string, CommunityBeta[]> = {
       "share": 0.29,
       "beta": [
         {
-          "limb": "RH",
-          "holdId": 8
+          "limb": "LH",
+          "holdId": 9
         },
         {
-          "limb": "LH",
+          "limb": "RH",
           "holdId": 7
         },
         {
           "limb": "LF",
-          "holdId": 5
+          "holdId": 8
         },
         {
-          "limb": "LH",
-          "holdId": 11
+          "limb": "RF",
+          "holdId": 10
         },
         {
           "limb": "RH",
-          "holdId": 12
+          "holdId": 11
+        },
+        {
+          "limb": "LF",
+          "holdId": 16
+        },
+        {
+          "limb": "RH",
+          "holdId": 14
+        },
+        {
+          "limb": "RF",
+          "holdId": 7
+        },
+        {
+          "limb": "RH",
+          "holdId": 20
+        },
+        {
+          "limb": "RF",
+          "holdId": 19
+        },
+        {
+          "limb": "RH",
+          "holdId": 15
+        },
+        {
+          "limb": "LF",
+          "holdId": 18
+        },
+        {
+          "limb": "LF",
+          "holdId": 20
+        },
+        {
+          "limb": "LH",
+          "holdId": 15
+        }
+      ]
+    },
+    {
+      "name": "The short beta",
+      "share": 0.17,
+      "beta": [
+        {
+          "limb": "LH",
+          "holdId": 9
+        },
+        {
+          "limb": "RH",
+          "holdId": 7
+        },
+        {
+          "limb": "LF",
+          "holdId": 8
         },
         {
           "limb": "RF",
@@ -311,102 +369,36 @@ const DATA: Record<string, CommunityBeta[]> = {
           "holdId": 2
         },
         {
-          "limb": "LH",
-          "holdId": 15
-        },
-        {
           "limb": "LF",
-          "holdId": 1
-        },
-        {
-          "limb": "RH",
           "holdId": 16
         },
         {
           "limb": "LH",
-          "holdId": 16
-        },
-        {
-          "limb": "LF",
-          "holdId": 13
-        },
-        {
-          "limb": "RF",
-          "holdId": 8
-        },
-        {
-          "limb": "LH",
-          "holdId": 22
-        },
-        {
-          "limb": "RH",
-          "holdId": 22
-        }
-      ]
-    },
-    {
-      "name": "The short beta",
-      "share": 0.17,
-      "beta": [
-        {
-          "limb": "RH",
-          "holdId": 8
-        },
-        {
-          "limb": "RF",
-          "holdId": 5
-        },
-        {
-          "limb": "RF",
-          "holdId": 2
-        },
-        {
-          "limb": "RH",
-          "holdId": 11
-        },
-        {
-          "limb": "LH",
-          "holdId": 8
-        },
-        {
-          "limb": "LH",
-          "holdId": 11
-        },
-        {
-          "limb": "LF",
-          "holdId": 5
-        },
-        {
-          "limb": "LF",
-          "holdId": 9
-        },
-        {
-          "limb": "LH",
-          "holdId": 16
-        },
-        {
-          "limb": "RH",
-          "holdId": 16
-        },
-        {
-          "limb": "RF",
           "holdId": 14
         },
         {
           "limb": "LF",
-          "holdId": 13
+          "holdId": 18
         },
         {
           "limb": "LH",
-          "holdId": 22
+          "holdId": 20
         },
         {
           "limb": "RF",
-          "holdId": 11
+          "holdId": 7
+        },
+        {
+          "limb": "LH",
+          "holdId": 15
+        },
+        {
+          "limb": "RF",
+          "holdId": 19
         },
         {
           "limb": "RH",
-          "holdId": 22
+          "holdId": 15
         }
       ]
     }

@@ -50,20 +50,31 @@ const HAND_SET: Route[] = [
     tagline: 'The hands are a formality.',
     par: 16,
     start: { LH: 1, RH: 2, LF: 3, RF: 4 },
-    finish: [22],
+    finish: [15],
+    // A staircase for the feet and a few pinches to steady the hands. Step,
+    // step, stand up, and only then move a hand: each pinch is a balance
+    // point beside the shoulders, not a rung to pull on. The footholds come
+    // every quarter to half a metre, alternating sides; the pinches are
+    // single, small and staggered, so there is no ladder to haul up, and they
+    // turn into footholds on the way past. Standing on the feet is the cheap
+    // way up: campusing the pinches goes, but costs about five times the
+    // pump, and smearing past the footholds takes three times the moves.
+    // Checked by `npm run experiment:trust-feet`.
     holds: [
-      jug(1, -0.36, 1.55), jug(2, 0.3, 1.52),
-      foot(3, -0.42, 0.48), foot(4, 0.4, 0.52),
-      foot(5, -0.2, 1.0), foot(6, 0.46, 1.06),
-      jug(7, -0.42, 2.06), jug(8, 0.26, 2.1),
-      foot(9, -0.44, 1.5), foot(10, 0.28, 1.58),
-      jug(11, -0.2, 2.58), jug(12, 0.44, 2.6),
-      foot(13, -0.4, 2.02), foot(14, 0.3, 2.1),
-      jug(15, -0.36, 3.05), jug(16, 0.26, 3.12),
-      foot(17, -0.22, 2.54), foot(18, 0.42, 2.6),
-      foot(19, -0.34, 3.02), foot(20, 0.28, 3.08),
-      jug(21, -0.24, 3.55),
-      jug(22, 0.2, 3.84, { finish: true }),
+      jug(1, -0.28, 1.5), jug(2, 0.28, 1.5),
+      foot(3, -0.28, 0.5), foot(4, 0.3, 0.5),
+      foot(5, -0.34, 0.8), foot(6, 0.36, 1.02),
+      pinch(7, 0.34, 1.96),
+      foot(8, -0.32, 1.24), foot(10, 0.42, 1.3),
+      pinch(9, -0.34, 2.28),
+      foot(12, -0.32, 1.7),
+      pinch(11, 0.34, 2.7),
+      foot(16, -0.26, 2.06), foot(17, 0.3, 2.4),
+      pinch(14, -0.34, 3.04),
+      foot(18, -0.3, 2.64), foot(19, 0.32, 2.88),
+      pinch(20, -0.12, 3.46),
+      foot(21, -0.22, 3.22),
+      jug(15, -0.02, 3.92, { finish: true }),
     ],
   },
   {

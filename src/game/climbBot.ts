@@ -28,6 +28,18 @@ import { freshJuice, isFull, onMiss, onStick, spendDyno, onDynoStuck, type Juice
 
 export type Style = 'efficient' | 'reckless';
 
+/**
+ * What the climber may do with its feet. `on` is the game as played. The
+ * other two exist to check routes, not to play them: `off` never moves a foot
+ * (a climber who ignores their feet), and `smear` never puts a foot on a hold,
+ * only on blank wall (a climber who bypasses the footholds). A route that is
+ * about its feet should go worse, or not at all, in both.
+ */
+export type FeetMode = 'on' | 'off' | 'smear';
+
+/** One move the climber made: a limb onto a hold, a smear, or a dyno. */
+export type BotMove = { limb: LimbId | 'body'; holdId: number | null; smear?: boolean };
+
 export type ClimbReport = {
   route: string;
   style: Style;
@@ -48,6 +60,8 @@ export type ClimbReport = {
   high: number;
   /** [time, pump, wall angle at the body in degrees], twice a second. */
   trace: [number, number, number][];
+  /** Every move made, in order: where each limb ended up. */
+  sequence: BotMove[];
 };
 
 type Ctx = {
@@ -170,6 +184,7 @@ export function aimAt(state: SlingState, holds: Hold[], limb: LimbId, hold: Hold
 
 type Option =
   | { kind: 'throw'; aim: LaunchAim; hold: Hold }
+  | { kind: 'smear'; aim: LaunchAim }
   | { kind: 'place'; limb: LimbId; hold: Hold }
   | { kind: 'dyno'; dir: Vec2; power: number };
 
@@ -180,13 +195,18 @@ function handTop(s: SlingState): number {
 }
 
 /** Every move worth considering from here: throws at reachable holds, placements, and the dyno. */
-function options(c: Ctx, style: Style): Option[] {
+function options(c: Ctx, style: Style, feet: FeetMode = 'on'): Option[] {
   const s = c.sim;
   const out: Option[] = [];
   const finish = new Set(c.route.finish);
   const taken = new Set(LIMBS.map((id) => s.limbs[id].holdId).filter((x) => x !== null));
   for (const limb of LIMBS) {
     const l = s.limbs[limb];
+    if (!isHand(limb) && feet === 'off') continue;
+    if (!isHand(limb) && feet === 'smear') {
+      if (canLaunch(s, limb) && (l.phase !== 'held' || heldCount(s) >= 3)) out.push(...smearOptions(s, c.holds, limb));
+      continue;
+    }
     if (l.phase === 'free') {
       for (const h of placeableHolds(s, c.holds, limb)) {
         if (isHand(limb) && h.type === 'foothold') continue;
@@ -195,7 +215,8 @@ function options(c: Ctx, style: Style): Option[] {
     }
     if (!canLaunch(s, limb)) continue;
     // Something has to stay on while it flies: two at least, three if you are careful and can.
-    if (l.phase === 'held' && heldCount(s) < (style === 'efficient' && heldCount(s) === 4 ? 3 : 3)) continue;
+    // A climber who will not use their feet moves off two hands, or never moves.
+    if (l.phase === 'held' && heldCount(s) < (feet === 'off' ? 2 : 3)) continue;
     const holds = reachableHolds(s, c.holds, limb)
       .filter((h) => h.id !== l.holdId && (!taken.has(h.id) || (finish.has(h.id) && isHand(limb))))
       .filter((h) => !(isHand(limb) && h.type === 'foothold'))
@@ -213,6 +234,34 @@ function options(c: Ctx, style: Style): Option[] {
   if (style === 'reckless' && isFull(c.juice) && canDyno(s)) {
     const d = bestDyno(c);
     if (d) out.push({ kind: 'dyno', dir: d.dir, power: d.power });
+  }
+  return out;
+}
+
+/**
+ * Throws that put a foot on blank wall: aimed at points below and beside the
+ * hips, kept only if the physics says the foot ends up smeared there.
+ */
+function smearOptions(s: SlingState, holds: Hold[], limb: LimbId): Option[] {
+  const out: Option[] = [];
+  const side = limb === 'LF' ? -1 : 1;
+  for (const dy of [0.25, 0.4, 0.55, 0.7]) {
+    for (const dx of [0.3, 0.12, -0.05]) {
+      const to = { x: s.hip.x + side * dx, y: s.hip.y - dy };
+      const from = s.limbs[limb].pos;
+      const want = Math.atan2(to.y - from.y, to.x - from.x);
+      for (const power of [0.3, 0.45, 0.6]) {
+        const aim: LaunchAim = { limb, dir: { x: Math.cos(want), y: Math.sin(want) }, power };
+        const ghost = cloneSling(s);
+        if (!launch(ghost, aim, [])) continue;
+        for (let i = 0; i < 150 && !ghost.fallen; i++) {
+          stepSling(ghost, holds, DT, 0, []);
+          if (ghost.limbs[limb].phase !== 'flying') break;
+        }
+        const l = ghost.limbs[limb];
+        if (!ghost.fallen && l.phase === 'held' && l.holdId !== null && l.holdId < 0) { out.push({ kind: 'smear', aim }); break; }
+      }
+    }
   }
   return out;
 }
@@ -246,7 +295,7 @@ function keyOf(s: SlingState): string {
 function apply(c: Ctx, o: Option): void {
   const s = c.sim;
   if (o.kind === 'place') { placeLimb(s, o.limb, o.hold.id, c.holds, []); return; }
-  if (o.kind === 'throw') {
+  if (o.kind === 'throw' || o.kind === 'smear') {
     const leftOn = heldCount(s) - (s.limbs[o.aim.limb].phase === 'held' ? 1 : 0);
     c.pump = gain(c.pump, flingCost(o.aim.power, bodyAngle(s), leftOn));
     c.fat = { ...c.fat, power: Math.max(0, c.fat.power - FATIGUE.throwCost * o.aim.power ** 2 * (1 + Math.sin(Math.max(0, bodyAngle(s))))) };
@@ -278,11 +327,14 @@ function bestDyno(c: Ctx): { dir: Vec2; power: number; high: number } | null {
 
 export function climb(
   route: Route, style: Style,
-  opts: { maxSeconds?: number; maxMoves?: number; fitness?: number; think?: number; shake?: boolean } = {},
+  opts: { maxSeconds?: number; maxMoves?: number; fitness?: number; think?: number; shake?: boolean; feet?: FeetMode } = {},
 ): ClimbReport {
   const maxSeconds = opts.maxSeconds ?? 300;
   const maxMoves = opts.maxMoves ?? 70;
-  const sim = initialSling(route.holds, route.start, profileOf(route));
+  // A climber who will not use their feet starts with them on the mat, not on
+  // the start holds, and never puts them on anything.
+  const start = opts.feet === 'off' ? { LH: route.start.LH, RH: route.start.RH } : route.start;
+  const sim = initialSling(route.holds, start, profileOf(route));
   const c: Ctx = {
     route, holds: route.holds, sim, pump: freshPump(opts.fitness ?? 1), fat: freshFatigue(opts.fitness ?? 1), juice: freshJuice(),
     t: 0, trace: [], maxPump: 0, nextTrace: 0,
@@ -295,6 +347,7 @@ export function climb(
   let high = handTop(sim);
   let outcome: ClimbReport['outcome'] = 'timeout';
   const visits = new Map<string, number>();
+  const sequence: BotMove[] = [];
 
   while (c.t < maxSeconds && moves < maxMoves) {
     const events = settle(c);
@@ -324,7 +377,7 @@ export function climb(
     wait(c, opts.think ?? (style === 'efficient' ? 1.8 : 1.0));
     if (c.sim.fallen) continue;
 
-    const opts2 = options(c, style);
+    const opts2 = options(c, style, opts.feet);
     if (!opts2.length) {
       if (process.env.DBG) {
         console.log('no options', LIMBS.map((id) => `${id}:${c.sim.limbs[id].phase[0]}${c.sim.limbs[id].holdId}@${c.sim.limbs[id].pos.x.toFixed(2)},${c.sim.limbs[id].pos.y.toFixed(2)}`).join(' '), 'hip', c.sim.hip.y.toFixed(2), 'sh', c.sim.shoulder.y.toFixed(2));
@@ -356,13 +409,20 @@ export function climb(
     if (!best || bestV < -1e4) { outcome = 'stuck'; break; }
     if (process.env.DBG) {
       const L = (id: LimbId) => `${id}:${c.sim.limbs[id].phase[0]}${c.sim.limbs[id].holdId ?? '-'}`;
-      const d = best.kind === 'throw' ? `${best.aim.limb}->${best.hold.id}` : best.kind === 'place' ? `place ${best.limb}->${best.hold.id}` : 'DYNO';
+      const d = best.kind === 'throw' ? `${best.aim.limb}->${best.hold.id}` : best.kind === 'place' ? `place ${best.limb}->${best.hold.id}` : best.kind === 'smear' ? `smear ${best.aim.limb}` : 'DYNO';
       console.log(c.t.toFixed(1), LIMBS.map(L).join(' '), 'pump', c.pump.pump.toFixed(2), 'opts', opts2.length, 'do', d, bestV.toFixed(2));
     }
     const before = handTop(c.sim);
     apply(c, best);
     const out = settle(c, 3);
     moves++;
+    if (best.kind === 'dyno') sequence.push({ limb: 'body', holdId: null });
+    else {
+      const limb = best.kind === 'place' ? best.limb : best.aim.limb;
+      const l = c.sim.limbs[limb];
+      const on = l.phase === 'held' ? l.holdId : null;
+      sequence.push(on !== null && on < 0 ? { limb, holdId: null, smear: true } : { limb, holdId: on });
+    }
     if (best.kind === 'dyno') {
       dynos++;
       if (out.some((e) => e.kind === 'catch')) c.juice = onDynoStuck(c.juice, handTop(c.sim) - before);
@@ -375,7 +435,7 @@ export function climb(
   return {
     route: route.id, style, outcome, moves, dynos, misses, time: round(c.t), rested: round(rested), shakeouts,
     maxPump: round(c.maxPump), endPump: round(c.pump.pump), floor: round(c.pump.floor), high: round(high),
-    trace: c.trace,
+    trace: c.trace, sequence,
   };
 }
 
